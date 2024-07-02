@@ -1,0 +1,6 @@
+NEW FEATURES:
+
+1- BE report new group
+2- Customized segment build
+3- DBT Modeling
+4- Monitoring or Orchestration tool (TBA)
