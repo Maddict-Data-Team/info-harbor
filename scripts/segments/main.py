@@ -18,48 +18,57 @@ def create_client():
 def metadata_placelift():
     # Initialize the BigQuery client
     client = create_client()
+
     # Generate and execute queries
+    for index, country in enumerate(countries):
+        if country in table_mapping:
+            # Get the corresponding backend report for the country
+            backend_report = backend_reports[index]
 
-    # Generate the query string
-    query = f"""INSERT INTO {project}.{dataset_metadata}.{tbl_campaign_tracker} (code_name, campaign_name, country, start_date, end_date, status, type)
-    VALUES ('{code_name}', '{campaign_name}', '{countries}', '{start_date}', '{end_date}', 'On Hold', '{type}');"""
+            # Generate the query string
+            query = f"""INSERT INTO
+        {project}.{dataset_metadata}.{tbl_campaign_tracker} ( id,
+            code_name,
+            campaign_name,
+            start_date,
+            end_date,
+            country,
+            status,
+            type,
+            backend_report,
+            last_update,
+            time_interval )
+        SELECT
+        COALESCE(MAX(id), 0) + 1,
+        {code_name},
+        '{campaign_name}',
+        DATE '{start_date}',
+        DATE '{end_date}',
+        '{country}',
+        'On Hold',
+        '{type}',
+        {backend_report},
+        NULL,
+        {time_interval}
+        FROM
+        `maddictdata.Metadata.Campaign_Tracker`;"""
 
-    query = f"""INSERT INTO
-  {project}.{dataset_metadata}.{tbl_campaign_tracker} ( id,
-    code_name,
-    campaign_name,
-    start_date,
-    end_date,
-    country,
-    status,
-    type,
-    backend_report,
-    last_update,
-    time_interval )
-SELECT
-  COALESCE(MAX(id), 0) + 1,
-  99999,
-  'Test Campaign',
-  DATE '2024-01-01',
-  DATE '2024-12-31',
-  'Test Country',
-  'Active',
-  'Test Type',
-  12345,
-  TIMESTAMP '2024-01-01 00:00:00 UTC',
-  30
-FROM
-  `maddictdata.Metadata.Campaign_Tracker`;"""
+            print(
+                f"Query for {campaign_name} - {country} added to BigQuery dataset {dataset_campaign_segments}"
+            )
 
-    # Execute the query
-    query_job = client.query(query)
+        else:
+            print(f"No mapping found for country: {country}")
 
-    # Wait for the query to complete
-    rows = query_job.result()
+        # Execute the query
+        query_job = client.query(query)
 
-    print(
-        f"Query for {campaign_name} - {countries} added to BigQuery dataset {dataset_campaign_segments}"
-    )
+        # Wait for the query to complete
+        rows = query_job.result()
+
+        print(
+            f"Query for {campaign_name} - {countries} added to BigQuery dataset {dataset_campaign_segments}"
+        )
 
 
 def main():

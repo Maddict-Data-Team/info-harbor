@@ -30,6 +30,9 @@ dataset_HWG = "Automated_HWG"
 dataset_mt_Placelift = "maddictdata.Metadata.Placelift"
 table_HG = "Home_Graph_Cumulative"
 
+
+
+
 # BQ Schemas
 
 schema_back_end = [
