@@ -24,38 +24,37 @@ def metadata_placelift():
         if country in table_mapping:
             # Get the corresponding backend report for the country
             backend_report = backend_reports[index]
-
             # Generate the query string
             query = f"""INSERT INTO
-        {project}.{dataset_metadata}.{tbl_campaign_tracker} ( id,
-            code_name,
-            campaign_name,
-            start_date,
-            end_date,
-            country,
-            status,
-            type,
-            backend_report,
-            last_update,
-            time_interval )
-        SELECT
-        COALESCE(MAX(id), 0) + 1,
-        {code_name},
-        '{campaign_name}',
-        DATE '{start_date}',
-        DATE '{end_date}',
-        '{country}',
-        'On Hold',
-        '{type}',
-        {backend_report},
-        NULL,
-        {time_interval}
-        FROM
-        `maddictdata.Metadata.Campaign_Tracker`;"""
+                        {project}.{dataset_metadata}.{tbl_campaign_tracker} ( id,
+                            code_name,
+                            campaign_name,
+                            start_date,
+                            end_date,
+                            country,
+                            status,
+                            type,
+                            backend_report,
+                            last_update,
+                            time_interval )
+                        SELECT
+                        COALESCE(MAX(id), 0) + 1,
+                        {code_name},
+                        '{campaign_name}',
+                        DATE '{start_date}',
+                        DATE '{end_date}',
+                        '{country}',
+                        '{stage_0}',
+                        '{type}',
+                        {backend_report},
+                        NULL,
+                        {time_interval}
+                        FROM
+                        `maddictdata.Metadata.Campaign_Tracker`;"""
 
-            print(
-                f"Query for {campaign_name} - {country} added to BigQuery dataset {dataset_campaign_segments}"
-            )
+            # print(
+            #     f"Query for {campaign_name} - {country} added to BigQuery dataset {dataset_campaign_segments}"
+            # )
 
         else:
             print(f"No mapping found for country: {country}")
@@ -67,7 +66,7 @@ def metadata_placelift():
         rows = query_job.result()
 
         print(
-            f"Query for {campaign_name} - {countries} added to BigQuery dataset {dataset_campaign_segments}"
+            f"{campaign_name} - {countries[index]} added to {tbl_campaign_tracker}"
         )
 
 

@@ -1,5 +1,13 @@
 from google.cloud import bigquery
 
+# Metadata Status
+
+stage_0 = "Pre-Validation"
+stage_1 = "Validation"
+stage_2 = "Active"
+stage_3 = "Completion Period"
+stage_4 = "Finished"
+
 # Dictionaries
 
 table_mapping = {
@@ -28,8 +36,8 @@ drive_link_folder_Adops = (
 #https://drive.google.com/drive/u/0/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM
 # Table
 
-tbl_campaign_tracker = 'Campaign_Tracker'
-
+tbl_campaign_tracker = 'test'
+#'Campaign_Tracker'
 # BQ Datasets
 
 dataset_LS = "Location_Signals"
