@@ -30,8 +30,13 @@ dataset_HWG = "Automated_HWG"
 dataset_mt_Placelift = "maddictdata.Metadata.Placelift"
 table_HG = "Home_Graph_Cumulative"
 
+# Metadata Status
 
-
+stage_0 = "Pre-Validation"
+stage_1 = "Validation"
+stage_2 = "Active"
+stage_3 = "Completion Period"
+stage_4 = "Finished"
 
 # BQ Schemas
 

@@ -1,4 +1,4 @@
-# backend-report-automation 2
+# Overview
 
 One Paragraph of project description goes here. Explain what your project does and what it's for in a few sentences.
 
@@ -9,6 +9,13 @@ These instructions will get you a copy of the project up and running on your loc
 ### Prerequisites
 
 What things you need to install the software and how to install them.
+
+## Campaign Tracker Status
+
+- Validation
+- Active
+- Completion Period
+- Finished
 
 ## Features
 
