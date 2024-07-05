@@ -30,6 +30,12 @@ dataset_HWG = "Automated_HWG"
 dataset_mt_Placelift = "maddictdata.Metadata.Placelift"
 table_HG = "Home_Graph_Cumulative"
 
+dataset_metadata = "Metadata"
+table_campaign_tracker = "Campaign_Tracker"
+table_behavior_lookup = "Lookup_Behavior"
+table_os_mapping = "device_os_mapping"
+
+
 # Metadata Status
 
 stage_0 = "Pre-Validation"
