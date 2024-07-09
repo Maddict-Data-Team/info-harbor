@@ -36,9 +36,10 @@ drive_link_folder_Adops = (
 #https://drive.google.com/drive/u/0/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM
 # Table
 
-tbl_campaign_tracker = 'test'
+tbl_campaign_tracker = 'Campaign_Tracker'
 #'Campaign_Tracker'
 # BQ Datasets
+# 'test'
 
 dataset_LS = "Location_Signals"
 dataset_footfall = "Back_End_Footfall"

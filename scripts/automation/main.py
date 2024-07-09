@@ -63,13 +63,13 @@ def main():
     drive_service = create_drive_service(secret_data_token_info)
     
     # Run queries and process data
-    q_cmpgn = [
+    q_campagin_tracker = [
         (update_status_1, "(Separating types)"),
         (update_status_3, "(Checking 7 days interval)"),
         (update_status_4, "(Updating metadata)")
     ]
     
-    for query, message in q_cmpgn:
+    for query, message in q_campagin_tracker:
         run_query(query, bq_client)
         print(message)
     
