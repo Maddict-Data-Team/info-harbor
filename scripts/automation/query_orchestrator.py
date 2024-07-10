@@ -128,6 +128,7 @@ def run_pipeline_queries(config,codename,last_update,today,countries,pipeline_ty
         print("Running Query: ",query_name)
         run_query_save_table(parsed_query,destination,bq_client)
         print("Finished Query: ",query_name)
+        print("-------------------------------------------------")
 
 def run_by_pipeline_type(codename,bq_client):
 
