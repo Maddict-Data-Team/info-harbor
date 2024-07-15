@@ -104,7 +104,7 @@ def get_metadata(codename,config,bq_client):
     for row in metadata_raw:
         countries.append(row[2])
 
-    last_update = row[0].strftime("%Y-%m-%d")#   %m/%d/%Y")
+    last_update = row[0].strftime("%Y-%m-%d")
     today = row[1].strftime("%Y-%m-%d")
     pipelie_type = row[3]
     return countries,last_update,today,pipelie_type
@@ -127,7 +127,7 @@ def run_pipeline_queries(config,codename,last_update,today,countries,pipeline_ty
         query_raw = config.get(pipeline_type,query_name)
         parsed_query = build_query(query_raw,codename,last_update,today,countries,union_countries)
         destination = f"{project}.{dataset_footfall}.{codename}_{query_name}"
-        # input(destination)
+
         print("Running Query: ",query_name)
         run_query_save_table(parsed_query,destination,bq_client)
         print("Finished Query: ",query_name)
@@ -136,7 +136,7 @@ def run_pipeline_queries(config,codename,last_update,today,countries,pipeline_ty
 
 def run_pipeline_queries_custom(config,codename,last_update,today,countries,pipeline_type,bq_client,queries):
     print("Stared with the queries")
-    # queries = config.get(pipeline_type,'queries').split(",")
+
     queries_union_countries = config.get(pipeline_type,'queries_union_countries').split(",")
 
     for query_name in queries:
@@ -149,7 +149,7 @@ def run_pipeline_queries_custom(config,codename,last_update,today,countries,pipe
         query_raw = config.get(pipeline_type,query_name)
         parsed_query = build_query(query_raw,codename,last_update,today,countries,union_countries)
         destination = f"{project}.{dataset_footfall}.{codename}_{query_name}"
-        # input(destination)
+
         print("Running Query: ",query_name)
         run_query_save_table(parsed_query,destination,bq_client)
         print("Finished Query: ",query_name)
