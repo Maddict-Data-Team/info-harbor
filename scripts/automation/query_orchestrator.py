@@ -13,6 +13,7 @@ static_query_replace = {
     "{device_os_mapping_table}":table_os_mapping,
     "{hwg_table}":table_HG,
     "{lookup_behavior_table}":table_behavior_lookup,
+    "{back_end_report_dataset}":dataset_BERs
 }
 
 country_id_dict = {
@@ -51,7 +52,8 @@ def read_config():
     return config
 
 
-def build_query(query,codename,last_update="",today="",countries=[],union_countries=False):
+
+def build_query(query,codename,last_update="",today="",countries=[],union_countries=False,radiuses = []):
     # This function builds the query by replacing the placeholders with the necessary
     # strings, and sets up some queries with union in case of multiple country input
 
@@ -72,7 +74,7 @@ def build_query(query,codename,last_update="",today="",countries=[],union_countr
     query = query.replace("{last_update}",last_update)
     query = query.replace("{today}",today)
     
-
+# visitors
     if union_countries:
         union_query = ""
         for country in countries:
@@ -81,13 +83,23 @@ def build_query(query,codename,last_update="",today="",countries=[],union_countr
             union_query += query.replace("{country}",country)\
             .replace("{country_beh}",get_country_beh(country))
             # .replace("{country_id}",country_id_dict[country])
-        return union_query
+
+        query = union_query
     else:
         if len(countries)>0:
             query = query.replace("{country}",countries[0])\
             .replace("{country_beh}",get_country_beh(countries[0]))
             # .replace("{country_id}",country_id_dict[countries[0]])
-        return query
+        
+    
+    if "{radius}" in query:
+        union_query = ""
+        for radius in radiuses:
+            if union_query !="":
+                union_query +="\nUNION ALL\n"
+            union_query += query.replace("{radius}",str(radius))
+        query = union_query
+    return query
 
 
 
@@ -109,13 +121,22 @@ def get_metadata(codename,config,bq_client):
     pipelie_type = row[3]
     return countries,last_update,today,pipelie_type
     
+def get_radiuses(codename,config,bq_client):
 
+    query = config.get("Setup",'radius_query')
+    build_query(query,codename)
+
+    result = run_query_get_res(query,bq_client)
+    radiuses = []
+    for row in result:
+        radiuses.append(row[0])
+    return radiuses
 
 def run_pipeline_queries(config,codename,last_update,today,countries,pipeline_type,bq_client):
     print("Stared with the queries")
     queries = config.get(pipeline_type,'queries').split(",")
     queries_union_countries = config.get(pipeline_type,'queries_union_countries').split(",")
-
+    radiuses = get_radiuses(codename,config,bq_client)
     for query_name in queries:
         if query_name == "common_queries":
             run_pipeline_queries(config,codename,last_update,today,countries,"Common Queries",bq_client)
@@ -125,7 +146,7 @@ def run_pipeline_queries(config,codename,last_update,today,countries,pipeline_ty
         if query_name in queries_union_countries:
             union_countries = True
         query_raw = config.get(pipeline_type,query_name)
-        parsed_query = build_query(query_raw,codename,last_update,today,countries,union_countries)
+        parsed_query = build_query(query_raw,codename,last_update,today,countries,union_countries,radiuses)
         destination = f"{project}.{dataset_footfall}.{codename}_{query_name}"
 
         print("Running Query: ",query_name)
