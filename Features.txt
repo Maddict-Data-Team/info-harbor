@@ -4,3 +4,6 @@ NEW FEATURES:
 2- Customized segment build
 3- DBT Modeling
 4- Monitoring or Orchestration tool (TBA)
+
+Notes:
+install ini for vscode

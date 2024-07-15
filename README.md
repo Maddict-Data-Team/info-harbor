@@ -12,10 +12,12 @@ What things you need to install the software and how to install them.
 
 ## Campaign Tracker Status
 
+- Pre-Validation
 - Validation
 - Active
 - Completion Period
 - Finished
+- Error (Special Case)
 
 ## Features
 
