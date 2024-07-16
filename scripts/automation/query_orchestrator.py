@@ -1,34 +1,6 @@
 import configparser
 from variables import *
-import pyperclip
 
-
-
-""" 
-parameters: 
-return:
-"""
-
-
-
-#will transfere to variables later, and change some of the names
-static_query_replace = {
-    "{hwg_dataset}": dataset_HWG,
-    "{footfall_dataset}":dataset_footfall,
-    "{project}":project,
-    "{metadata_dataset}":dataset_metadata,
-    "{campaign_tracker_table}":table_campaign_tracker,
-    "{location_signals_dataset}":dataset_LS,
-    "{device_os_mapping_table}":table_os_mapping,
-    "{hwg_table}":table_HG,
-    "{lookup_behavior_table}":table_behavior_lookup,
-    "{back_end_report_dataset}":dataset_BERs
-}
-
-country_id_dict = {
-    "UAE":"1",
-    "KSA":"2",
-    "KWT":"3"}
 
 def run_query(query, bq_client):
     """ Run a query
@@ -265,12 +237,12 @@ def run_pipeline_queries(config,codename,last_update,today,countries,pipeline_ty
 
         print("Running Query: ",query_name)
         # Run the query and save the result in the destination table
-        run_query_save_table(parsed_query,destination,bq_client,"WRITE_TRUNCATE")
+        run_query_save_table(parsed_query,destination,bq_client,"WRITE_APPEND")
         print("Finished Query: ",query_name)
         print("-------------------------------------------------")
 
 
-def run_by_pipeline_type(codename,bq_client):
+def run_by_codename(codename,bq_client):
     """This function calls the other functions in turn to execute the pipeline
     parameters:
         codename: identification for the campaign
