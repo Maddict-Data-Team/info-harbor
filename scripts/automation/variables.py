@@ -97,7 +97,8 @@ static_query_replace = {
     "{device_os_mapping_table}":table_os_mapping,
     "{hwg_table}":table_HG,
     "{lookup_behavior_table}":table_behavior_lookup,
-    "{back_end_report_dataset}":dataset_BERs
+    "{back_end_report_dataset}":dataset_BERs,
+    "{Campaign_segments_dataset}":dataset_campaign_segments
 }
 
 country_id_dict = {
