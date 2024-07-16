@@ -29,11 +29,13 @@ def authenticate_with_bigquery(secret_data_bq_info):
 def create_drive_service(secret_data_token_info):
     creds = Credentials.from_authorized_user_info(secret_data_token_info)
     return build("drive", "v3", credentials=creds)
-
-def query_bigquery_and_process(bq_client, drive_service):
-    query_job = bq_client.query(update_status_2)
+########################################################
+def start_the_process(bq_client, drive_service, query):
+    
+    query_job = bq_client.query(query)
     results = query_job.result()
 
+    #### CHOOSE ACCORDING
     for row in results:
         code_name = row.code_name
         campaign_name = row.campaign_name
@@ -51,7 +53,9 @@ def run_query(query, bq_client):
     query_job.result()
     print("Query executed successfully")
 
-def main():
+
+def query_bigquery_and_process(q_md_get_placelift, update_status_2):
+    
     secret_client = secretmanager.SecretManagerServiceClient()
     
     # Get secrets
@@ -62,20 +66,27 @@ def main():
     bq_client = authenticate_with_bigquery(secret_data_bq_info)
     drive_service = create_drive_service(secret_data_token_info)
     
+    # First update and process
+    start_the_process(bq_client, drive_service, q_md_get_placelift)
+
     # Run queries and process data
     q_campagin_tracker = [
-        (update_status_1, "(Separating types)"),
-        (update_status_3, "(Checking 7 days interval)"),
-        (update_status_4, "(Updating metadata)")
+        (q_update_status, "(Updating Status)")
     ]
     
     for query, message in q_campagin_tracker:
         run_query(query, bq_client)
         print(message)
+        
+    # Second update and process
+    start_the_process(bq_client, drive_service, q_select_active_interval)
     
-    query_bigquery_and_process(bq_client, drive_service)
-    
-    return 'getting message !!!'
+    return 'Main Automation Done!'
+
+def main():
+    query_bigquery_and_process(q_md_get_placelift, update_status_2)
+
+
 
 if __name__ == "__main__":
     main()
