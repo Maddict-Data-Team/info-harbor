@@ -31,7 +31,8 @@ dataset_mt_Placelift = "maddictdata.Metadata.Placelift"
 table_HG = "Home_Graph_Cumulative"
 
 dataset_metadata = "Metadata"
-table_campaign_tracker = "Campaign_Tracker"
+tbl_cmpgn_tracker = "Campaign_Tracker"
+tbl_cmpgn_test = "test"
 table_behavior_lookup = "Lookup_Behavior"
 table_os_mapping = "device_os_mapping"
 
@@ -109,6 +110,35 @@ country_id_dict = {
 
 # Campaign Tracker
 
+q_update_status = f"""
+UPDATE `maddictdata.Metadata.{tbl_cmpgn_test}`
+SET status = CASE
+    WHEN CURRENT_DATE() < start_date + 7 THEN 'Validation'
+    WHEN CURRENT_DATE() BETWEEN start_date + 7 AND end_date + 7 THEN 'Active'
+    WHEN CURRENT_DATE() > end_date + 7 THEN 'Completion Period'
+    ELSE status
+END
+WHERE status IN ('Pre-Validation', 'Validation', 'Active');"""
+
+q_select_active_interval = f"""SELECT
+  id,
+  code_name,
+  campaign_name,
+  start_date,
+  end_date,
+  country,
+  type,
+  backend_report,
+  time_interval,
+  last_update,
+  status
+FROM
+  `maddictdata.Metadata.test`
+WHERE
+  type = '%Dashboard' 
+  AND status IN ('Validation', 'Active', 'Completion Period')
+  AND DATE_SUB(CURRENT_DATE(), INTERVAL time_interval DAY) >= DATE(last_update);"""
+  
 # Main Queries
 
 update_status_1 = f"""
