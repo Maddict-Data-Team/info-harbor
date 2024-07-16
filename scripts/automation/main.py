@@ -35,7 +35,9 @@ def start_the_process(bq_client, drive_service, query):
     query_job = bq_client.query(query)
     results = query_job.result()
 
+    # TODO
     #### CHOOSE ACCORDING
+    #CODENAME []
     for row in results:
         code_name = row.code_name
         campaign_name = row.campaign_name
@@ -46,7 +48,9 @@ def start_the_process(bq_client, drive_service, query):
         print(f"Processing row: code = {code_name}")
 
         doc_to_bq.main(code_name, drive_service, bq_client)
-        footfall.main(bq_client, code_name, country, start_date, end_date)
+        #APPEND TO LIST IF NOT IN IT
+    #ITERATE OVER LIST
+    footfall.main(bq_client, code_name, country, start_date, end_date)
 
 def run_query(query, bq_client):
     query_job = bq_client.query(query)
@@ -78,7 +82,7 @@ def query_bigquery_and_process(q_md_get_placelift, update_status_2):
         run_query(query, bq_client)
         print(message)
         
-    # Second update and process
+    # Run the process
     start_the_process(bq_client, drive_service, q_select_active_interval)
     
     return 'Main Automation Done!'

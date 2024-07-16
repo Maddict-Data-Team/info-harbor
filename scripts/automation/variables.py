@@ -110,19 +110,12 @@ country_id_dict = {
 
 # Campaign Tracker
 
-q_md_get_placelift = f"""SELECT
-  *
-FROM
-  `maddictdata.Metadata.Campaign_Tracker`
-WHERE
-  status = 'Completion Period';"""
-
 q_update_status = f"""
 UPDATE `maddictdata.Metadata.{tbl_cmpgn_test}`
 SET status = CASE
-    WHEN CURRENT_DATE() < start_date THEN 'Validation'
-    WHEN CURRENT_DATE() BETWEEN start_date AND end_date THEN 'Active'
-    WHEN CURRENT_DATE() > end_date THEN 'Completion Period'
+    WHEN CURRENT_DATE() < start_date + 7 THEN 'Validation'
+    WHEN CURRENT_DATE() BETWEEN start_date + 7 AND end_date + 7 THEN 'Active'
+    WHEN CURRENT_DATE() > end_date + 7 THEN 'Completion Period'
     ELSE status
 END
 WHERE status IN ('Pre-Validation', 'Validation', 'Active');"""
@@ -142,8 +135,9 @@ q_select_active_interval = f"""SELECT
 FROM
   `maddictdata.Metadata.test`
 WHERE
-  status = 'Active'
-  AND DATE_SUB(CURRENT_DATE(), INTERVAL time_interval DAY) > DATE(last_update);"""
+  type = '%Dashboard' 
+  AND status IN ('Validation', 'Active', 'Completion Period')
+  AND DATE_SUB(CURRENT_DATE(), INTERVAL time_interval DAY) >= DATE(last_update);"""
   
 # Main Queries
 
