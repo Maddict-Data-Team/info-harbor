@@ -43,6 +43,7 @@ def start_the_process(bq_client, drive_service, query):
     # CODENAME []
     for row in results:
         code_name = row.code_name
+        backend_report = row.backend_report
         campaign_name = row.campaign_name
         country = row.country
         start_date = str(row.start_date)
