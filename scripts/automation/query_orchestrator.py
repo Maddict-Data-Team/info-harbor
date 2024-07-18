@@ -1,6 +1,6 @@
 import configparser
 from variables import *
-from datetime import datetime
+from datetime import datetime,timedelta
 
 
 def run_query(query, bq_client):
@@ -169,19 +169,23 @@ def get_metadata(codename, config, bq_client):
     # extract the list of countries
     countries = []
     for row in metadata_raw:
-        countries.append(row[2])
+        countries.append(row.country)
 
     # The following metadata are the same for all rows of a certain codename
     # Extract end date
-    end_date = row[0]
+    end_date = row.end_date
     # Extract the pipeline type
-    pipeline_type = row[1]
+    pipeline_type = row.type
     # Extract the interval
-    interval = row[3]
+    interval = row.time_interval
     # Extract start date
-    start_date = row[4]
+    last_update = row.last_update
     # Extract the pipeline type
-    return countries, pipeline_type, end_date, interval, start_date
+    backend_report = row.backend_report
+
+    if pipeline_type == "Placelift" and backend_report == 0:
+        pipeline_type = "Placelift No BER"
+    return countries, pipeline_type, end_date, interval, last_update
 
 
 def get_radiuses(codename, config, bq_client):
@@ -262,26 +266,38 @@ def run_pipeline_queries(
         destination = f"{project}.{dataset_footfall}.{codename}_{query_name}"
 
         print("Running Query: ", query_name)
+
+        # In all queries except visitors the table should be entirely replaced
+        in_write_disposition = "WRITE_TRUNCATE"
+        if query_name == "visitors":
+           in_write_disposition = "WRITE_APPEND"
+        
         # Run the query and save the result in the destination table
-        run_query_save_table(parsed_query, destination, bq_client, "WRITE_APPEND")
+        run_query_save_table(parsed_query, destination, bq_client, in_write_disposition)
         print("Finished Query: ", query_name)
         print("-------------------------------------------------")
 
 
-def get_run_dates(end_date, start_date, interval):
+def get_run_dates(end_date, last_update, interval):
+    end_date = datetime(end_date.year, end_date.month, end_date.day)
+    last_update = datetime(last_update.year, last_update.month, last_update.day)
     today = datetime.today()
 
-    start_date_q = today - datetime.timedelta(days=interval + 7)
+    # Should remove later
+    # start_date_q = today - timedelta(days=interval + 7)
 
-    end_date_q = today - datetime.timedelta(days=7)
-    end_date_p7 = end_date + datetime.timedelta(days=7)
+    end_date_q = today - timedelta(days=7)
+    
+    end_date_p7 = end_date + timedelta(days=7)
 
     if end_date_q > end_date_p7:
         end_date_q = end_date_p7
 
-    if start_date_q < start_date:
-        start_date_q = start_date
-    return start_date_q.strftime("%Y-%m-%d"), end_date_q.strftime("%Y-%m-%d")
+    # Should remove later
+    # start_date_m7 = start_date - timedelta(days=7)
+    # if start_date_q < start_date_m7:
+    #     start_date_q = start_date_m7
+    return last_update.strftime("%Y-%m-%d"), end_date_q.strftime("%Y-%m-%d")
 
 
 def run_by_codename(codename, bq_client):
@@ -297,14 +313,16 @@ def run_by_codename(codename, bq_client):
     config = read_config()
     print("Read the ini file")
     # Retreive necessary metadata parameters
-    countries, pipeline_type, end_date, interval, start_date = get_metadata(
+    countries, pipeline_type, end_date, interval, last_update = get_metadata(
         codename, config, bq_client
     )
     # # Get the list of radiuses used
     radiuses = get_radiuses(codename, config, bq_client)
     # Get dates for the current run
-    start_date_q, end_date_q = get_run_dates(end_date, start_date, interval)
+    start_date_q, end_date_q = get_run_dates(end_date, last_update, interval)
     print("Got the metadata")
+
+    print(start_date_q, end_date_q)
     # Run the pipeline using the metadata parameters
     run_pipeline_queries(
         config,
@@ -316,3 +334,4 @@ def run_by_codename(codename, bq_client):
         bq_client,
         radiuses,
     )
+

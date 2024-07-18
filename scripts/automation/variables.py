@@ -92,7 +92,7 @@ static_query_replace = {
     "{footfall_dataset}":dataset_footfall,
     "{project}":project,
     "{metadata_dataset}":dataset_metadata,
-    "{campaign_tracker_table}":table_campaign_tracker,
+    "{campaign_tracker_table}":tbl_cmpgn_tracker,
     "{location_signals_dataset}":dataset_LS,
     "{device_os_mapping_table}":table_os_mapping,
     "{hwg_table}":table_HG,
