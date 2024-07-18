@@ -6,7 +6,7 @@ from google.cloud import secretmanager
 import json
 
 import doc_to_bq
-import footfall
+import query_orchestrator
 
 from variables import *
 
@@ -29,7 +29,7 @@ def authenticate_with_bigquery(secret_data_bq_info):
 def create_drive_service(secret_data_token_info):
     creds = Credentials.from_authorized_user_info(secret_data_token_info)
     return build("drive", "v3", credentials=creds)
-########################################################
+########################################################space
 def start_the_process(bq_client, drive_service, query):
     
     query_job = bq_client.query(query)
@@ -50,7 +50,7 @@ def start_the_process(bq_client, drive_service, query):
         doc_to_bq.main(code_name, drive_service, bq_client)
         #APPEND TO LIST IF NOT IN IT
     #ITERATE OVER LIST
-    footfall.main(bq_client, code_name, country, start_date, end_date)
+    query_orchestrator.main(bq_client, code_name, country, start_date, end_date)
 
 def run_query(query, bq_client):
     query_job = bq_client.query(query)
