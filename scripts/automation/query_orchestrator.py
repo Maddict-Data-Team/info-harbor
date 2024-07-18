@@ -2,6 +2,7 @@ import configparser
 from variables import *
 from datetime import datetime
 
+
 def run_query(query, bq_client):
     """Run a query
     parameters:
@@ -87,8 +88,9 @@ def read_config():
     return config
 
 
-
-def build_query(query,codename,start_date_q="",end_date_q="",countries=[],radiuses = []):
+def build_query(
+    query, codename, start_date_q="", end_date_q="", countries=[], radiuses=[]
+):
     """This function builds the query by replacing the placeholders with the necessary
     strings, and sets up some queries with union in case of multiple country input
 
@@ -109,10 +111,10 @@ def build_query(query,codename,start_date_q="",end_date_q="",countries=[],radius
     # Set the codenameif the campaign
     query = query.replace("{codename}", codename)
     # Set the start date of the query
-    query = query.replace("{start_date_q}",start_date_q)
+    query = query.replace("{start_date_q}", start_date_q)
     # Set the end date of the query
-    query = query.replace("{end_date_q}",end_date_q)
-    
+    query = query.replace("{end_date_q}", end_date_q)
+
     # If there is a country placeholder there should be a union repeating the query for each country
     # This is done because countries each have separate tables.
     if "{country}" in query:
@@ -170,17 +172,17 @@ def get_metadata(codename, config, bq_client):
         countries.append(row[2])
 
     # The following metadata are the same for all rows of a certain codename
-    # Extract end date 
+    # Extract end date
     end_date = row[0]
     # Extract the pipeline type
-    pipelie_type = row[1]
+    pipeline_type = row[1]
     # Extract the interval
     interval = row[3]
-    # Extract start date 
+    # Extract start date
     start_date = row[4]
     # Extract the pipeline type
-    return countries,pipelie_type,end_date,interval,start_date
-    
+    return countries, pipeline_type, end_date, interval, start_date
+
 
 def get_radiuses(codename, config, bq_client):
     """Get radiuses used in the POIs
@@ -205,9 +207,19 @@ def get_radiuses(codename, config, bq_client):
         radiuses.append(row[0])
     return radiuses
 
-def run_pipeline_queries(config,codename,end_date_q,start_date_q,countries,pipeline_type,bq_client,radiuses):
-    """ Builds and runs the necessary queries for a given pipeline type
-    parameters: 
+
+def run_pipeline_queries(
+    config,
+    codename,
+    end_date_q,
+    start_date_q,
+    countries,
+    pipeline_type,
+    bq_client,
+    radiuses,
+):
+    """Builds and runs the necessary queries for a given pipeline type
+    parameters:
         config: parsed configuration file
         codename: identification for the campaign
         end_date_q: last date for the run "YYYY-MM-DD"
@@ -220,13 +232,22 @@ def run_pipeline_queries(config,codename,end_date_q,start_date_q,countries,pipel
     """
     print("Stared with the queries")
     # Read the query list from the config file for the given pipeline type
-    queries = config.get(pipeline_type,'queries').split(",")
-    # Loop over the list of query names 
+    queries = config.get(pipeline_type, "queries").split(",")
+    # Loop over the list of query names
     for query_name in queries:
         # If the quey name is common_queries then run the common queries specified in the config file
         if query_name == "common_queries":
             # Re-call the function with "Common ueries" as the pipeline type
-            run_pipeline_queries(config,codename,start_date_q,end_date_q,countries,"Common Queries",bq_client,radiuses)
+            run_pipeline_queries(
+                config,
+                codename,
+                start_date_q,
+                end_date_q,
+                countries,
+                "Common Queries",
+                bq_client,
+                radiuses,
+            )
             # skip the rest of the steps for this iteration
             continue
 
@@ -234,7 +255,9 @@ def run_pipeline_queries(config,codename,end_date_q,start_date_q,countries,pipel
         # Get the raw query for the given query name
         query_raw = config.get(pipeline_type, query_name)
         # Build the query from the raw
-        parsed_query = build_query(query_raw,codename,start_date_q,end_date_q,countries,radiuses)
+        parsed_query = build_query(
+            query_raw, codename, start_date_q, end_date_q, countries, radiuses
+        )
         # Set the destiation table using the codename and query name
         destination = f"{project}.{dataset_footfall}.{codename}_{query_name}"
 
@@ -244,23 +267,24 @@ def run_pipeline_queries(config,codename,end_date_q,start_date_q,countries,pipel
         print("Finished Query: ", query_name)
         print("-------------------------------------------------")
 
-def get_run_dates(end_date,start_date,interval):
+
+def get_run_dates(end_date, start_date, interval):
     today = datetime.today()
 
-    start_date_q = today - datetime.timedelta(days=interval+7)
+    start_date_q = today - datetime.timedelta(days=interval + 7)
 
     end_date_q = today - datetime.timedelta(days=7)
-    end_date_p7 = (end_date + datetime.timedelta(days=7))
+    end_date_p7 = end_date + datetime.timedelta(days=7)
 
     if end_date_q > end_date_p7:
         end_date_q = end_date_p7
 
     if start_date_q < start_date:
         start_date_q = start_date
-    return start_date_q.strftime("%Y-%m-%d"), end_date_q.strftime("%Y-%m-%d") 
+    return start_date_q.strftime("%Y-%m-%d"), end_date_q.strftime("%Y-%m-%d")
 
 
-def run_by_codename(codename,bq_client):
+def run_by_codename(codename, bq_client):
     """This function calls the other functions in turn to execute the pipeline
     parameters:
         codename: identification for the campaign
@@ -271,13 +295,24 @@ def run_by_codename(codename,bq_client):
 
     # read configuration file
     config = read_config()
-    print("Read te ini file")
+    print("Read the ini file")
     # Retreive necessary metadata parameters
-    countries,pipelie_type,end_date,interval,start_date = get_metadata(codename,config,bq_client)
+    countries, pipeline_type, end_date, interval, start_date = get_metadata(
+        codename, config, bq_client
+    )
     # # Get the list of radiuses used
-    radiuses = get_radiuses(codename,config,bq_client)
+    radiuses = get_radiuses(codename, config, bq_client)
     # Get dates for the current run
-    start_date_q, end_date_q = get_run_dates(end_date,start_date,interval)
+    start_date_q, end_date_q = get_run_dates(end_date, start_date, interval)
     print("Got the metadata")
-    # Run the pipeline using the metadata parameters 
-    run_pipeline_queries(config,codename,end_date_q,start_date_q,countries,pipelie_type,bq_client,radiuses)
+    # Run the pipeline using the metadata parameters
+    run_pipeline_queries(
+        config,
+        codename,
+        end_date_q,
+        start_date_q,
+        countries,
+        pipeline_type,
+        bq_client,
+        radiuses,
+    )
