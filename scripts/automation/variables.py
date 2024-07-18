@@ -107,7 +107,6 @@ country_id_dict = {
     "KWT":"3"}
 
 
-
 # Campaign Tracker
 
 q_update_status = f"""
@@ -133,51 +132,13 @@ q_select_active_interval = f"""SELECT
   last_update,
   status
 FROM
-  `maddictdata.Metadata.test`
+  `maddictdata.Metadata.{tbl_cmpgn_test}`
 WHERE
   type = '%Dashboard' 
-  AND status IN ('Validation', 'Active', 'Completion Period')
+  AND status IN ('Active', 'Completion Period')
   AND DATE_SUB(CURRENT_DATE(), INTERVAL time_interval DAY) >= DATE(last_update);"""
   
 # Main Queries
-
-update_status_1 = f"""
-UPDATE
-  `{dataset_mt_Placelift}`
-SET
-  status = 'In Progress'
-WHERE
-  status = 'On Hold'
-  AND type = 'Dashboard'
-"""
-
-update_status_2 = f"""
-SELECT
-  *
-FROM
-  `{dataset_mt_Placelift}`
-WHERE
-  status = 'Break'
-  OR status = 'In Progress'
-"""
-
-update_status_3 = f"""
-UPDATE
- `{dataset_mt_Placelift}`
-SET
-  status = 'Break'
-WHERE
-  DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) > DATE(end_date)
-"""
-
-update_status_4 = f"""
-UPDATE
-  `{dataset_mt_Placelift}`
-SET
-  status = 'Done'
-WHERE
-  status = 'Break'
-"""
 
 #########################
 

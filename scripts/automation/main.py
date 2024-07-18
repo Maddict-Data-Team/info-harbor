@@ -69,9 +69,6 @@ def query_bigquery_and_process(q_md_get_placelift, update_status_2):
     # Authenticate with BigQuery and create Drive service
     bq_client = authenticate_with_bigquery(secret_data_bq_info)
     drive_service = create_drive_service(secret_data_token_info)
-    
-    # First update and process
-    start_the_process(bq_client, drive_service, q_md_get_placelift)
 
     # Run queries and process data
     q_campagin_tracker = [
@@ -88,9 +85,7 @@ def query_bigquery_and_process(q_md_get_placelift, update_status_2):
     return 'Main Automation Done!'
 
 def main():
-    query_bigquery_and_process(q_md_get_placelift, update_status_2)
-
-
+    query_bigquery_and_process(update_status_2)
 
 if __name__ == "__main__":
     main()
