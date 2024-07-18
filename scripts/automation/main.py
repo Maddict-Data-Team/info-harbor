@@ -29,7 +29,7 @@ def authenticate_with_bigquery(secret_data_bq_info):
 def create_drive_service(secret_data_token_info):
     creds = Credentials.from_authorized_user_info(secret_data_token_info)
     return build("drive", "v3", credentials=creds)
-########################################################space
+########################################################space 1
 def start_the_process(bq_client, drive_service, query):
     
     query_job = bq_client.query(query)
