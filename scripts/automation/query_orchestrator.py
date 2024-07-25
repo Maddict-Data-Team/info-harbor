@@ -72,6 +72,8 @@ def get_country_beh(country):
     # Only QAT has a different Name
     if country == "QAT":
         return "QTR"
+    elif country == "EGY":
+        return "EGP"
     else:
         return country
 
@@ -286,7 +288,7 @@ def get_run_dates(end_date, last_update, interval):
     # Should remove later
     # start_date_q = today - timedelta(days=interval + 7)
 
-    end_date_q = today - timedelta(days=7)
+    end_date_q = today - timedelta(days=9)
     
     end_date_p7 = end_date + timedelta(days=7)
 
