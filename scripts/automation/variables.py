@@ -120,17 +120,7 @@ END
 WHERE status NOT IN ('Finished');"""
 
 q_select_active_interval = f"""SELECT
-  id,
-  code_name,
-  campaign_name,
-  start_date,
-  end_date,
-  country,
-  type,
-  backend_report,
-  time_interval,
-  last_update,
-  status
+  DISTINCT code_name
 FROM
   `maddictdata.Metadata.{tbl_cmpgn_test}`
 WHERE
