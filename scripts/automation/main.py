@@ -63,7 +63,6 @@ def start_the_process(bq_client, drive_service, query):
         query_orchestrator.main(bq_client, code_name)
 
 
-
 def run_query(query, bq_client):
     query_job = bq_client.query(query)
     query_job.result()
