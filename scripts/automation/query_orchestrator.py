@@ -1,7 +1,7 @@
 import configparser
 from variables import *
 from datetime import datetime,timedelta
-
+import traceback
 
 def run_query(query, bq_client):
     """Run a query
@@ -91,7 +91,7 @@ def read_config():
 
 
 def build_query(
-    query, codename, start_date_q="", end_date_q="", countries=[], radiuses=[]
+    query, codename, start_date_q="", end_date_q="", countries=[], radiuses=[], custom_replace_dict={}
 ):
     """This function builds the query by replacing the placeholders with the necessary
     strings, and sets up some queries with union in case of multiple country input
@@ -116,6 +116,10 @@ def build_query(
     query = query.replace("{start_date_q}", start_date_q)
     # Set the end date of the query
     query = query.replace("{end_date_q}", end_date_q)
+
+    # set last_update as now if available
+    now = datetime.now()
+    query = query.replace("{new_last_update}",str(now))
 
     # If there is a country placeholder there should be a union repeating the query for each country
     # This is done because countries each have separate tables.
@@ -301,6 +305,13 @@ def get_run_dates(end_date, last_update, interval):
     #     start_date_q = start_date_m7
     return last_update.strftime("%Y-%m-%d"), end_date_q.strftime("%Y-%m-%d")
 
+def update_last_update(config,codename,bq_client):
+    
+    query = config.get("Setup", "update_last_update")
+    query = build_query(query,codename)
+
+    run_query(query,bq_client)
+
 
 def run_by_codename(codename, bq_client):
     """This function calls the other functions in turn to execute the pipeline
@@ -310,30 +321,36 @@ def run_by_codename(codename, bq_client):
     return:
         Nothing
     """
+    try:
+            
+        # read configuration file
+        config = read_config()
+        print("Read the ini file")
+        # Retreive necessary metadata parameters
+        countries, pipeline_type, end_date, interval, last_update = get_metadata(
+            codename, config, bq_client
+        )
+        # # Get the list of radiuses used
+        radiuses = get_radiuses(codename, config, bq_client)
+        # Get dates for the current run
+        start_date_q, end_date_q = get_run_dates(end_date, last_update, interval)
+        print("Got the metadata")
 
-    # read configuration file
-    config = read_config()
-    print("Read the ini file")
-    # Retreive necessary metadata parameters
-    countries, pipeline_type, end_date, interval, last_update = get_metadata(
-        codename, config, bq_client
-    )
-    # # Get the list of radiuses used
-    radiuses = get_radiuses(codename, config, bq_client)
-    # Get dates for the current run
-    start_date_q, end_date_q = get_run_dates(end_date, last_update, interval)
-    print("Got the metadata")
+        print(start_date_q, end_date_q)
+        # Run the pipeline using the metadata parameters
+        run_pipeline_queries(
+            config,
+            codename,
+            end_date_q,
+            start_date_q,
+            countries,
+            pipeline_type,
+            bq_client,
+            radiuses,
+        )  
+        
 
-    print(start_date_q, end_date_q)
-    # Run the pipeline using the metadata parameters
-    run_pipeline_queries(
-        config,
-        codename,
-        end_date_q,
-        start_date_q,
-        countries,
-        pipeline_type,
-        bq_client,
-        radiuses,
-    )
-
+        update_last_update(config,codename,bq_client)
+    except:
+        traceback.print_exc()
+        return "error"
