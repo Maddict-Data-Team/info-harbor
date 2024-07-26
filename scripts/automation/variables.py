@@ -120,7 +120,8 @@ END
 WHERE status NOT IN ('Finished');"""
 
 q_select_active_interval = f"""SELECT
-  DISTINCT code_name
+  code_name,
+  backend_report
 FROM
   `maddictdata.Metadata.{tbl_cmpgn_test}`
 WHERE

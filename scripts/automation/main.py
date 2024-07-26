@@ -34,27 +34,34 @@ def create_drive_service(secret_data_token_info):
 
 
 def start_the_process(bq_client, drive_service, query):
-
     query_job = bq_client.query(query)
     results = query_job.result()
 
-    # TODO
-    #### CHOOSE ACCORDING
-    # CODENAME []
+    # Set to keep track of processed code names
+    processed_code_names = set()
+
+    # List to collect unique code names
+    unique_code_names = []
+
+    # Process each row
     for row in results:
         code_name = row.code_name
         backend_report = row.backend_report
-        campaign_name = row.campaign_name
-        country = row.country
-        start_date = str(row.start_date)
-        end_date = str(row.end_date)
+        print(f"Processing row: code_name = {code_name}")
+        
+        # Check if the code_name has already been processed
+        if code_name not in processed_code_names:
+            # Upload backend for this code_name
+            upload_backend.main(drive_service, bq_client, backend_report)
+            
+            # Add the code_name to the set and list
+            processed_code_names.add(code_name)
+            unique_code_names.append(code_name)
 
-        print(f"Processing row: code = {code_name}")
+    # Iterate over unique code names and call query_orchestrator
+    for code_name in unique_code_names:
+        query_orchestrator.main(bq_client, code_name)
 
-        upload_backend.main(code_name, drive_service, bq_client)
-        # APPEND TO LIST IF NOT IN IT
-    # ITERATE OVER LIST
-    query_orchestrator.main(bq_client, code_name)
 
 
 def run_query(query, bq_client):
