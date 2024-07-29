@@ -183,7 +183,7 @@ def delete_table(code, bq_client):
     bq_client.delete_table(table_ref, not_found_ok=True)
 
 
-def main(code_name, drive_service, bq_client):
+def main(drive_service, bq_client, code_name):
 
     get_file_id = navigate_and_search_file(
         drive_service, folder_id_Backend_Reports, code_name

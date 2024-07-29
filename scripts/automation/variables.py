@@ -112,31 +112,24 @@ country_id_dict = {
 q_update_status = f"""
 UPDATE `maddictdata.Metadata.{tbl_cmpgn_test}`
 SET status = CASE
-    WHEN CURRENT_DATE() < start_date + 7 THEN 'Validation'
     WHEN CURRENT_DATE() BETWEEN start_date + 7 AND end_date + 7 THEN 'Active'
+    WHEN CURRENT_DATE() < start_date + 7 THEN 'Validation'
     WHEN CURRENT_DATE() > end_date + 7 THEN 'Completion Period'
     ELSE status
 END
-WHERE status IN ('Pre-Validation', 'Validation', 'Active');"""
+WHERE status NOT IN ('Finished');"""
 
 q_select_active_interval = f"""SELECT
-  id,
   code_name,
-  campaign_name,
-  start_date,
-  end_date,
-  country,
-  type,
-  backend_report,
-  time_interval,
-  last_update,
-  status
+  backend_report
 FROM
   `maddictdata.Metadata.{tbl_cmpgn_test}`
 WHERE
-  type = '%Dashboard' 
-  AND status IN ('Active', 'Completion Period')
-  AND DATE_SUB(CURRENT_DATE(), INTERVAL time_interval DAY) >= DATE(last_update);"""
+  ( status = 'Active'
+    AND time_interval >= 0
+    AND DATE_SUB(CURRENT_DATE(), INTERVAL time_interval DAY) >= DATE(last_update) )
+  OR ( status = 'Completion Period'
+    AND DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) >= DATE(end_date) );"""
   
 # Main Queries
 
