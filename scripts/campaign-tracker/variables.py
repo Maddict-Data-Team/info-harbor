@@ -18,6 +18,7 @@ table_mapping = {
     "OMN": "POI_DB_OMN",
     "BHR": "POI_DB_BHR",
     "EGY": "POI_DB_EGP",
+    "MAR": "POI_DB_MAR",
 
 }
 
