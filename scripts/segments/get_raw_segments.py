@@ -2,7 +2,7 @@
 from google.cloud import bigquery
 from google.oauth2 import service_account
 import datetime
-
+# add google cred
 from variables import *
 from input import *
 
