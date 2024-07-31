@@ -12,7 +12,7 @@ from variables import *
 def navigate_and_search_file(
     drive_service,
     backend_reports_folder_id,
-    code_name,
+    backend_report,
     month_name=datetime.now().strftime("%B"),
 ):
 
@@ -59,12 +59,12 @@ def navigate_and_search_file(
             "id"
         ]  # Assuming list_folders_inside returns a similar structure
 
-    matching_files = search_files_in_folder(drive_service, month_folder_id, code_name)
+    matching_files = search_files_in_folder(drive_service, month_folder_id, backend_report)
     if not matching_files:
-        print(f"No files starting with '{code_name}' found in folder '{month_name}'.")
+        print(f"No files starting with '{backend_report}' found in folder '{month_name}'.")
         return 0
     else:
-        print(f"Files starting with '{code_name}' found in folder '{month_name}':")
+        print(f"Files starting with '{backend_report}' found in folder '{month_name}':")
 
         moved_file_ids = []  # List to store IDs of files successfully moved
         for file in matching_files:
@@ -123,7 +123,7 @@ def create_folder_used(service, parent_folder_id, folder_name):
     print(f"Folder '{folder_name}' created with ID: {file['id']}")
 
 
-def insert_new_BER(link_id, code, bq_client):
+def insert_new_BER(link_id, backend_report, bq_client, code_name):
 
     for id in link_id:
         # Construct the new link
@@ -137,7 +137,7 @@ def insert_new_BER(link_id, code, bq_client):
         # Define BigQuery Table Schema
         schema = schema_back_end
         # Define Table Reference
-        table_ref = bq_client.dataset(dataset_BERs).table(f"{code}_new")
+        table_ref = bq_client.dataset(dataset_BERs).table(f"{backend_report}_new")
         # Create an empty table first
         table = bigquery.Table(table_ref, schema=schema)
         # Set the external data configuration
@@ -145,27 +145,27 @@ def insert_new_BER(link_id, code, bq_client):
         # Create the table
         table = bq_client.create_table(table)
         print(f"External table {table.table_id} created successfully.")
-        insert_to_main_BER(code, bq_client)
-        delete_table(code, bq_client)
-        remove_dups(bq_client, code)
+        insert_to_main_BER(backend_report, bq_client, code_name)
+        delete_table(backend_report, bq_client)
+        remove_dups(bq_client, code_name)
 
 
 # Function to run a query
-def remove_dups(bq_client, code):
+def remove_dups(bq_client, code_name):
 
-    query_job = bq_client.query(q_deduplicate_ber(code))  # Start the query job
+    query_job = bq_client.query(q_deduplicate_ber(code_name))  # Start the query job
     query_job.result()  # Wait for the query to finish
     print(f"Query executed successfully", end=": ")
     print("(Removed duplication)")
 
 
-def insert_to_main_BER(code, bq_client):
+def insert_to_main_BER(backend_report, bq_client, code_name):
 
     query = f"""
-    Insert INTO `{project}.{dataset_BERs}.{code}`
+    Insert INTO `{project}.{dataset_BERs}.{code_name}`
     (
         Select *
-        FROM {project}.{dataset_BERs}.{f"{code}_new"}
+        FROM {project}.{dataset_BERs}.{f"{backend_report}_new"}
     )
     """
 
@@ -175,18 +175,18 @@ def insert_to_main_BER(code, bq_client):
     query_job.result()
 
 
-def delete_table(code, bq_client):
+def delete_table(backend_report, bq_client):
     # Specify the dataset and table to delete
-    table_ref = bq_client.dataset(dataset_BERs).table(f"{code}_new")
+    table_ref = bq_client.dataset(dataset_BERs).table(f"{backend_report}_new")
 
     # Delete the table
     bq_client.delete_table(table_ref, not_found_ok=True)
 
-
-def main(drive_service, bq_client, code_name):
+# code_name
+def main(drive_service, bq_client, backend_report, code_name):
 
     get_file_id = navigate_and_search_file(
-        drive_service, folder_id_Backend_Reports, code_name
+        drive_service, folder_id_Backend_Reports, backend_report
     )
     print(get_file_id)
 
@@ -198,7 +198,7 @@ def main(drive_service, bq_client, code_name):
         last_month_date = today - timedelta(days=today.day)
         last_month = last_month_date.strftime("%B")
         get_file_id_last_month = navigate_and_search_file(
-            drive_service, folder_id_Backend_Reports, code_name, last_month
+            drive_service, folder_id_Backend_Reports, backend_report, last_month
         )
 
         if get_file_id == 0:
@@ -218,10 +218,10 @@ def main(drive_service, bq_client, code_name):
 
     if get_file_id == 0:
         # today = datetime.now()
-        print(f"No Backend reports found for {code_name} this week")
+        print(f"No Backend reports found for {backend_report} this week")
     else:
-        print(f"New backend reports are being moved to {code_name} in BigQuery")
-        insert_new_BER(get_file_id, code_name, bq_client)
+        print(f"New backend reports are being moved to {backend_report} in BigQuery")
+        insert_new_BER(get_file_id, backend_report, bq_client, code_name)
 
 
 if __name__ == "__main__":

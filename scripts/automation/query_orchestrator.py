@@ -350,7 +350,7 @@ def run_by_codename(codename, bq_client):
         )  
         
 
-        update_last_update(config,codename,bq_client)
+        # update_last_update(config,codename,bq_client)
     except:
         traceback.print_exc()
         return "error"

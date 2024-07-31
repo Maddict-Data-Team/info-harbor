@@ -51,6 +51,7 @@ schema_back_end = [
     bigquery.SchemaField("campaign", "STRING"),
     bigquery.SchemaField("LINE", "STRING"),
     bigquery.SchemaField("TIMESTAMP", "TIMESTAMP"),
+    bigquery.SchemaField("req_id", "STRING"),
     bigquery.SchemaField("udid", "STRING"),
     bigquery.SchemaField("devraw", "STRING"),
     bigquery.SchemaField("country", "STRING"),
@@ -98,7 +99,8 @@ static_query_replace = {
     "{hwg_table}":table_HG,
     "{lookup_behavior_table}":table_behavior_lookup,
     "{back_end_report_dataset}":dataset_BERs,
-    "{Campaign_segments_dataset}":dataset_campaign_segments
+    "{Campaign_segments_dataset}":dataset_campaign_segments,
+    "{tbl_cmpgn_test}":tbl_cmpgn_test
 }
 
 country_id_dict = {
@@ -131,6 +133,17 @@ WHERE
   OR ( status = 'Completion Period'
     AND DATE_SUB(CURRENT_DATE(), INTERVAL 7 DAY) >= DATE(end_date) );"""
   
+
+q_select_by_codename = """SELECT
+  code_name,
+  backend_report
+  FROM
+  `maddictdata.Metadata.{campaign_tracker_table}`
+  where 
+  code_name = {codename}
+
+
+"""
 # Main Queries
 
 #########################
