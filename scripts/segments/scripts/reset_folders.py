@@ -2,7 +2,7 @@ import  os
 
 def reset_folders():
     # Define paths for the folders
-    folders = ['data/controlled', 'data/raw', 'data/served']
+    folders = ['scripts/segments/data/controlled', 'scripts/segments/data/raw', 'scripts/segments/data/served']
 
     # Loop through each folder and delete .csv files
     for folder in folders:
