@@ -2,9 +2,22 @@
 from google.cloud import bigquery
 from google.oauth2 import service_account
 import datetime
-# add google cred
+import sys
+import os
+
 from variables import *
+# Get the path to the directory containing this script (main.py)
+script_dir = os.path.dirname(__file__)
+
+# Get the parent directory of 'scripts'
+project_root = os.path.abspath(os.path.join(script_dir, '..'))
+
+# Add the parent directory to sys.path
+sys.path.append(project_root)
+
 from input import *
+
+#### add google cred
 
 def create_client():
     # Authenticate with BigQuery
@@ -40,7 +53,7 @@ def get_raw_segments(countries, segments):
                 segment_name = segment.replace(" ", "_")
                 #segment_name = segment.replace("/", "-")
                 row_count = 0
-                with open(f"data/raw/{code_name}_{country}_{segment_name}_{now}.csv",'a') as outf:
+                with open(f"scripts/segments/data/raw/{code_name}_{country}_{segment_name}_{now}.csv",'a') as outf:
                     outf.write("DID\n")
                     for row in rows:
                         row_count+=1
