@@ -188,9 +188,16 @@ def get_metadata(codename, config, bq_client):
     last_update = row.last_update
     # Extract the pipeline type
     backend_report = row.backend_report
+    # Get the field that indicates if there are segments
+    segments =  row.segments
+    if pipeline_type == "Placelift Report" or pipeline_type == "Placelift Dashboard" or pipeline_type == "Placelift":
+        if segments == 0:
+            pipeline_type = "Placelift No Segments"
+        elif backend_report == 0:
+            pipeline_type = "Placelift No BER"
+        else:
+            pipeline_type = "Placelift"
 
-    if pipeline_type == "Placelift" and backend_report == 0:
-        pipeline_type = "Placelift No BER"
     return countries, pipeline_type, end_date, interval, last_update
 
 
@@ -289,8 +296,6 @@ def get_run_dates(end_date, last_update, interval):
     last_update = datetime(last_update.year, last_update.month, last_update.day)
     today = datetime.today()
 
-    # Should remove later
-    # start_date_q = today - timedelta(days=interval + 7)
 
     end_date_q = today - timedelta(days=9)
     
@@ -299,10 +304,6 @@ def get_run_dates(end_date, last_update, interval):
     if end_date_q > end_date_p7:
         end_date_q = end_date_p7
 
-    # Should remove later
-    # start_date_m7 = start_date - timedelta(days=7)
-    # if start_date_q < start_date_m7:
-    #     start_date_q = start_date_m7
     return last_update.strftime("%Y-%m-%d"), end_date_q.strftime("%Y-%m-%d")
 
 def update_last_update(config,codename,bq_client):
@@ -350,7 +351,7 @@ def run_by_codename(codename, bq_client):
         )  
         
 
-        # update_last_update(config,codename,bq_client)
+        update_last_update(config,codename,bq_client)
     except:
         traceback.print_exc()
         return "error"
