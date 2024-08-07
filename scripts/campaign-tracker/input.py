@@ -1,11 +1,15 @@
-code_name = "" # 12345
+code_name = "117" # 12345
 
-campaign_name = "" # MyNameIsJeff
+campaign_name = "Columbia" # MyNameIsJeff
 
-countries = [] # "UAE" ,"KSA"
+countries = ["KSA","UAE"] # "UAE" ,"KSA"
 
-start_date = "" # "2024-06-10"
+start_date = "2024-06-28" # "2024-06-10"
 
-end_date = "" # "2024-06-30"
+end_date = "2024-07-08" # "2024-06-30"
 
-type = "" # Dashboard or Placelift
+type = "Placelift" # Dashboard or Placelift
+
+backend_reports = [0,0]
+
+time_interval = 0
