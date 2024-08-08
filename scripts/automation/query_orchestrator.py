@@ -2,6 +2,7 @@ import configparser
 from variables import *
 from datetime import datetime,timedelta
 import traceback
+import os
 
 def run_query(query, bq_client):
     """Run a query
@@ -85,8 +86,15 @@ def read_config():
     Return:
         config: parsed .ini file
     """
+    #get the absolute directory of the current script
+    script_dir = os.path.dirname(__file__)
+    # the relative path to the configuration
+    rel_path = "queries.ini"
+    # join the two above paths
+    abs_file_path = os.path.join(script_dir, rel_path)
+
     config = configparser.ConfigParser()
-    config.read("scripts/automation/queries.ini")
+    config.read(abs_file_path)
     return config
 
 
