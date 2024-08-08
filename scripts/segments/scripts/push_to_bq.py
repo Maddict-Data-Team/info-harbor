@@ -1,10 +1,17 @@
 #this code is for pushing the audience segment to big query in preparation for the reports
+import sys
+import os
 
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
-from input import *
 from variables import *
+
+script_dir = os.path.dirname(__file__)
+project_root = os.path.abspath(os.path.join(script_dir, '..'))
+sys.path.append(project_root)
+
+from input import *
 
 # Authenticate with BigQuery
 credentials = service_account.Credentials.from_service_account_file(

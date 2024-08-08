@@ -15,17 +15,21 @@ table_mapping = {
 
 project = "maddictdata"
 dataset = "Back_End_Reports"
-dir_data = "data"
+dir_data = "scripts/segments/data"
 
 # Keys
 
 key_bq = "keys/maddictdata-bq.json"
 key_google_sheets = "keys/maddictdata-google-sheets.json"
 
+# Folders
+
+MAIN_DRIVE_FOLDER_ID = '1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf'
+
 drive_link_folder_Adops = (
-    "https://drive.google.com/drive/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM"
+    "https://drive.google.com/drive/folders/1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf"
 )
-#https://drive.google.com/drive/u/0/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM
+#https://drive.google.com/drive/u/0/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM https://drive.google.com/drive/u/0/folders/1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf
 # Table
 
 table_placelift = 'Placelift'
