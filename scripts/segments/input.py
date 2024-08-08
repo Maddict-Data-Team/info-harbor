@@ -1,5 +1,7 @@
 code_name = "999" # 122
 
+campaign_name = "AnyName" # Redoxon
+
 countries = ["BHR"] # "UAE", "KSA", "QAT"
 
 segments = ["Car Owners","custom_pizza_stores"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
@@ -16,6 +18,6 @@ dict_custom_segments = {
     }
 }
 
-excluded_segments_from_control = ["pizza_shops"] #  "Male"
+excluded_segments = [] #  "Male"
 
 controlled_size = 2000
