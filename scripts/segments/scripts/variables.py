@@ -38,6 +38,9 @@ dataset_BERs = "Back_End_Reports"
 dataset_campaign_segments = "Placelift_Campaign_Segments"
 dataset_metadata = 'Metadata'
 
+dataset_HWG = "Automated_HWG"
+table_HG = "Home_Graph_Cumulative"
+
 #BQ Schemas
 
 schema_DID = [bigquery.SchemaField("DID", "STRING")]
@@ -76,3 +79,16 @@ schema_Combined = [
     bigquery.SchemaField("Country", "STRING"),
     bigquery.SchemaField("Controlled", "BOOLEAN")
 ]
+
+
+
+static_query_replace = {
+    "{hwg_dataset}": dataset_HWG,
+    "{footfall_dataset}":dataset_footfall,
+    "{project}":project,
+    "{location_signals_dataset}":dataset_LS,
+    "{hwg_table}":table_HG,
+    
+}
+
+poi_filter_fields = ["General_Category","Category","Subcategory","GM_Subcategory","Chain"]
