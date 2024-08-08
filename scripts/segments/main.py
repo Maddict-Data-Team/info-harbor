@@ -17,19 +17,19 @@ sys.path.append(scripts_dir)
 
 from reset_folders import reset_folders
 from get_segments_raw import get_raw_segments
-# from split_segments import split_files
-# from transfer_to_drive import transfere_files_to_drive
-# from push_to_bq import run_push_to_bq
-# from create_be_table import create_BER_Table
+from split_segments import split_files
+from transfer_to_drive import transfer_files_to_drive
+from push_to_bq import run_push_to_bq
+from create_be_table import create_BER_Table
 
 
 def main():
 
     # reset_folders()
-    get_raw_segments(countries, segments)
+    # get_raw_segments(countries, segments)
     # split_files()
-    # drive_files_dict = transfere_files_to_drive()
-    # run_push_to_bq(drive_files_dict)
+    drive_files_dict = transfer_files_to_drive()
+    run_push_to_bq(drive_files_dict)
     # create_BER_Table(code_name)
     
 if __name__ == "__main__":

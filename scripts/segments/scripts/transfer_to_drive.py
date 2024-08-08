@@ -1,7 +1,7 @@
 # this code transferes the control and served segment to drive
 
 from variables import *
-from input import *
+#from input import *
 import os
 
 from pydrive2.auth import GoogleAuth
@@ -70,7 +70,7 @@ def transfer(drive, folder_id):
     return uploaded_ids
 
 
-def transfere_files_to_drive():
+def transfer_files_to_drive():
     # connect to drive
     scope = ["https://www.googleapis.com/auth/drive"]
     gauth = GoogleAuth()
@@ -80,8 +80,14 @@ def transfere_files_to_drive():
     drive = GoogleDrive(gauth)
 
     # create folder
-    folder_id = create_folder(drive, campaign_name, drive_link_folder_Adops)
+    folder_id = create_folder(drive, "campaign_name_1", drive_link_folder_Adops)
 
     # upload segments to drive
     uploaded_ids = transfer(drive, folder_id)
     return uploaded_ids
+
+def main():    
+    transfer_files_to_drive()
+    
+if __name__ == "__main__":
+    main()
