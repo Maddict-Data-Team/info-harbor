@@ -4,6 +4,8 @@ from google.oauth2 import service_account
 import datetime
 import sys
 import os
+import query_orchestrator
+
 
 from variables import *
 # Get the path to the directory containing this script (main.py)
@@ -32,21 +34,25 @@ def create_client():
 def get_raw_segments(countries, segments):
 
     # Initialize the BigQuery client
-    client = create_client()
+    bq_client = create_client()
     # Generate and execute queries
     for country in countries:
         for segment in segments:
             if country in table_mapping:
                 value = table_mapping[country]
                 
-                # Generate the query string
-                query = f"SELECT DISTINCT(DID) FROM {project}.{value}.Behavioral_{country}_RAW_Cumulative WHERE Behavior_Name = '{segment}'"
+                # # Generate the query string
+                # query = f"SELECT DISTINCT(DID) FROM {project}.{value}.Behavioral_{country}_RAW_Cumulative WHERE Behavior_Name = '{segment}'"
 
-                # Execute the query
-                query_job = client.query(query)
+                # # Execute the query
+                # query_job = client.query(query)
 
-                # Wait for the query to complete
-                rows = query_job.result()
+                # # Wait for the query to complete
+                # rows = query_job.result()
+                rows = query_orchestrator.run_query_behavior(segment,bq_client,country,code_name)
+                continue
+                if "custom" in segment:
+                    segment = segment.split("_",1)[1]
 
                 print(f"Query for {country} - {segment} added to BigQuery dataset {dataset_campaign_segments}")
                 now = datetime.datetime.now().strftime("%Y%m%d")

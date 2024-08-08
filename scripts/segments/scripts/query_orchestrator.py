@@ -1,9 +1,21 @@
 import configparser
-from scripts.variables import *
-from datetime import datetime,timedelta
-import traceback
+from variables import *
+import sys
 import os
+from pathlib import Path
+
+
+# Get the path to the directory containing this script (main.py)
+script_dir = os.path.dirname(__file__)
+
+# Get the parent directory of 'scripts'
+project_root = os.path.abspath(os.path.join(script_dir, '..'))
+
+# Add the parent directory to sys.path
+sys.path.append(project_root)
+
 from input import *
+
 
 class NoFilterForPoiQuery(Exception):
     pass
@@ -92,12 +104,15 @@ def read_config():
     Return:
         config: parsed .ini file
     """
+
     #get the absolute directory of the current script
     script_dir = os.path.dirname(__file__)
+    path = Path(script_dir)
+
     # the relative path to the configuration
     rel_path = "queries.ini"
     # join the two above paths
-    abs_file_path = os.path.join(script_dir, rel_path)
+    abs_file_path = os.path.join(path.parent.absolute(), rel_path)
 
     config = configparser.ConfigParser()
     config.read(abs_file_path)
@@ -105,7 +120,7 @@ def read_config():
 
 
 def build_query(
-    query_name, country, codename=0, radius=0, segment="",filters = ""
+    query, country, codename=0, radius=0, segment="",filters = ""
 ):
     """This function builds the query by replacing the placeholders with the necessary
     strings, and sets up some queries with union in case of multiple country input
@@ -121,8 +136,7 @@ def build_query(
     
 
     query = query.replace("{filters}", filters)
-        
-        
+            
     # Convert codename to str
     codename = str(codename)
 
@@ -141,6 +155,7 @@ def build_query(
     # If there is a radius placeholder there should be a union repeating the query for each radius
     # This is done this way since it will execute faster than using the radius column
     query = query.replace("{radius}", str(radius))
+
     return query
 
 
@@ -150,17 +165,18 @@ def run_query_behavior(segment,bq_client,country,codename=0):
 
     q_filters = ""
     radius = 0
-    if "hg" in segment.lower() or "near_by_residents" in segment.lower():
-        query = config.get("queries","query_HNWI")
+    if "hg" in segment.lower() or "near by residents" in segment.lower():
+        query = config.get("queries","query_HG ")
     elif "hnwi" in segment.lower():
-        query = config.get("queries","query_HG")
+        query = config.get("queries","query_HNWI")
     elif "custom" in segment.lower():
         query = config.get("queries","query_POI")
         q_filters,radius = get_custom_query_params(segment)
     else:
         query = config.get("queries","query_behavior")
 
-    query = build_query(country, codename, radius, segment,q_filters)
+
+    query = build_query(query,country, codename, radius, segment,q_filters)
 
     input(query)
     # rows = run_query_get_res(query,bq_client)
@@ -180,22 +196,16 @@ def get_custom_query_params(query_name):
             for filter in filter_list:
                 if i>0:query_filters_str+=','
                 query_filters_str+=f"'{filter}'"
+                i+=1
             query_filters_str += ")"
 
 
-    if filter == "":
+    if query_filters_str == "":
         raise NoFilterForPoiQuery("The POI query should have at least one filter")
 
-    return filter,query_dict["radius"]
-    #     "custom_pizza_stores":{
-    #     "type":"POI",
-    #     "General_Category":["food"],
-    #     "Category":["QSR","Restaurant","Fine Dining"],
-    #     "Subcategory":["Chicken Restaurant","Night Club"],
-    #     "GM_Subcategory":["Chicken restaurant","Night Club"],
-    #     "Chain":["KFC"],
-    #     "radius":123
-    # }
+
+    return query_filters_str,query_dict["radius"]
+
     
 
 
