@@ -1,11 +1,21 @@
 import os
 
-# import shutil
+import sys
 
 from variables import *
-from input import *
 import random
 
+
+# Get the path to the directory containing this script (main.py)
+script_dir = os.path.dirname(__file__)
+
+# Get the parent directory of 'scripts'
+project_root = os.path.abspath(os.path.join(script_dir, '..'))
+
+# Add the parent directory to sys.path
+sys.path.append(project_root)
+
+from input import *
 
 def read_data_folder(country):
     
@@ -49,6 +59,8 @@ def read_data_folder(country):
             for segment in excluded_segments:
                 #if the name is in the exclusion list append the data to the exclusion set 
                 # and set the exclusion boolean to true
+                if "custom" in segment:
+                    segment = segment.replace("custom_","")
                 if segment.replace(" ","_") in name:
                     print("Segment ",segment," added to the exclusion set")
                     exclude.update(temp_set)
@@ -139,3 +151,6 @@ def split_files():
         Write_output_to_files(sets, controlled_segment, names)  # write segments to files
 
 
+
+if __name__ == "__main__":
+    split_files()

@@ -25,7 +25,7 @@ dict_custom_segments = {
     }
 }
 
-excluded_segments = [] #  "Male"
+excluded_segments = ["custom_Fine Dining Night Club"] #  "Male"
 
 controlled_size = 2000
 hg_radius = 3000
