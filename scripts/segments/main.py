@@ -18,7 +18,7 @@ sys.path.append(scripts_dir)
 from reset_folders import reset_folders
 from get_segments_raw import get_raw_segments
 from split_segments import split_files
-# from transfer_to_drive import transfer_files_to_drive
+from transfer_to_drive import transfer_files_to_drive
 from push_to_bq import run_push_to_bq
 from authenticate_to_cloud import authenticate_get_clients
 # from create_be_table import create_BER_Table

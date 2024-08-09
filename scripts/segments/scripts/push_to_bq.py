@@ -7,7 +7,7 @@ from google.oauth2 import service_account
 
 from variables import *
 from transfer_to_drive import transfer_files_to_drive
-
+#aaa
 script_dir = os.path.dirname(__file__)
 project_root = os.path.abspath(os.path.join(script_dir, '..'))
 sys.path.append(project_root)
