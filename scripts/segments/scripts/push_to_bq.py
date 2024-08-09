@@ -6,6 +6,7 @@ from google.cloud import bigquery
 from google.oauth2 import service_account
 
 from variables import *
+from transfer_to_drive import transfer_files_to_drive
 
 script_dir = os.path.dirname(__file__)
 project_root = os.path.abspath(os.path.join(script_dir, '..'))
@@ -128,8 +129,8 @@ def run_push_to_bq(drive_files_dict):
 
 #main function
 def main():
-
-    run_push_to_bq()
+    drive_files_dict = transfer_files_to_drive()
+    run_push_to_bq(drive_files_dict)
 
 # main if needs to run separately
 if __name__ == "__main__":
