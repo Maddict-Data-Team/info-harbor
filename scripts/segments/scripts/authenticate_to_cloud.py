@@ -39,3 +39,5 @@ def authenticate_get_clients():
     # Authenticate with BigQuery and create Drive service
     bq_client = authenticate_with_bigquery(secret_data_bq_info)
     drive_service = create_drive_service(secret_data_token_info)
+
+    return bq_client,drive_service

@@ -20,13 +20,14 @@ from get_segments_raw import get_raw_segments
 from split_segments import split_files
 # from transfer_to_drive import transfer_files_to_drive
 from push_to_bq import run_push_to_bq
-
+from authenticate_to_cloud import authenticate_get_clients
 # from create_be_table import create_BER_Table
 
 def main():
-    pass
+
+    bq_client,drive_service = authenticate_get_clients()
     # reset_folders()
-    # get_raw_segments(countries, segments)
+    # get_raw_segments(countries, segments,bq_client)
     # split_files()
     # drive_files_dict = transfer_files_to_drive()
     run_push_to_bq()

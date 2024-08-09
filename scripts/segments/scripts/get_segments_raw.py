@@ -19,22 +19,10 @@ sys.path.append(project_root)
 
 from input import *
 
-#### add google cred
 
-def create_client():
-    # Authenticate with BigQuery
-    credentials = service_account.Credentials.from_service_account_file(
-        key_bq,
-        scopes=["https://www.googleapis.com/auth/cloud-platform"],
-    )
-    bq_client = bigquery.Client(credentials=credentials, project=project)
+def get_raw_segments(countries, segments,bq_client):
 
-    return bq_client
 
-def get_raw_segments(countries, segments):
-
-    # Initialize the BigQuery client
-    bq_client = create_client()
     # Generate and execute queries
     for country in countries:
         for segment in segments:
