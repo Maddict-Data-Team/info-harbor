@@ -50,7 +50,7 @@ def get_raw_segments(countries, segments):
                 # # Wait for the query to complete
                 # rows = query_job.result()
                 rows = query_orchestrator.run_query_behavior(segment,bq_client,country,code_name)
-                continue
+                
                 if "custom" in segment:
                     segment = segment.split("_",1)[1]
 
@@ -64,7 +64,7 @@ def get_raw_segments(countries, segments):
                     for row in rows:
                         row_count+=1
                         if row_count%200000==0:print("downloaded ",row_count," DIDs")
-                        did = row["DID"]
+                        did = row.DID
                         outf.write(f"{did}\n")
             else:
                 print(f"No mapping found for country: {country}")

@@ -146,6 +146,8 @@ def build_query(
 
     query = query.replace("{segment}", segment)
 
+    query = query.replace("{code_name}", code_name)
+
     # If there is a country placeholder there should be a union repeating the query for each country
     # This is done because countries each have separate tables.
     query = query.replace("{country}", country).replace(
@@ -166,7 +168,8 @@ def run_query_behavior(segment,bq_client,country,codename=0):
     q_filters = ""
     radius = 0
     if "hg" in segment.lower() or "near by residents" in segment.lower():
-        query = config.get("queries","query_HG ")
+        query = config.get("queries","query_HG")
+        radius = hg_radius
     elif "hnwi" in segment.lower():
         query = config.get("queries","query_HNWI")
     elif "custom" in segment.lower():
@@ -178,9 +181,9 @@ def run_query_behavior(segment,bq_client,country,codename=0):
 
     query = build_query(query,country, codename, radius, segment,q_filters)
 
-    input(query)
-    # rows = run_query_get_res(query,bq_client)
-    # return rows
+    print(query)
+    rows = run_query_get_res(query,bq_client)
+    return rows
 
 def get_custom_query_params(query_name):
     query_dict = dict_custom_segments[query_name]
