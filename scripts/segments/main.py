@@ -24,12 +24,12 @@ from create_be_table import create_BER_Table
 
 
 def main():
-
+    pass
     # reset_folders()
     # get_raw_segments(countries, segments)
     # split_files()
-    drive_files_dict = transfer_files_to_drive()
-    run_push_to_bq(drive_files_dict)
+    # drive_files_dict = transfer_files_to_drive()
+    # run_push_to_bq(drive_files_dict)
     # create_BER_Table(code_name)
     
 if __name__ == "__main__":

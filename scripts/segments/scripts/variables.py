@@ -96,3 +96,7 @@ static_query_replace = {
 }
 
 poi_filter_fields = ["General_Category","Category","Subcategory","GM_Subcategory","Chain"]
+
+
+secret_ber = f"projects/maddictdata/secrets/token-ber/versions/latest"
+secret_bq = f"projects/maddictdata/secrets/secret-bq/versions/latest"
