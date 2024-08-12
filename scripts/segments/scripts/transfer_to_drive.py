@@ -117,7 +117,7 @@ def transfer(drive, folder_id):
     return uploaded_ids
 
 
-def transferee_files_to_drive():
+def transfer_files_to_drive():
     # Connect to drive
     scope = ["https://www.googleapis.com/auth/drive"]
     gauth = GoogleAuth()
