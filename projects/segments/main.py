@@ -21,7 +21,7 @@ from split_segments import split_files
 from transfer_to_drive import transfer_files_to_drive
 from push_to_bq import run_push_to_bq
 from authenticate_to_cloud import authenticate_get_clients
-# from create_be_table import create_BER_Table
+from create_be_table import create_BER_Table
 
 def main():
 
@@ -30,8 +30,8 @@ def main():
     # get_raw_segments(countries, segments,bq_client)
     # split_files()
     # drive_files_dict = transfer_files_to_drive()
-    run_push_to_bq()
-    # create_BER_Table(code_name)
+    # run_push_to_bq()
+    create_BER_Table(code_name)
     
 if __name__ == "__main__":
     main()
