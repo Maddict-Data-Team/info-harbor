@@ -40,10 +40,8 @@ def create_BER_Table(code):
         print(f"Table {table.table_id} was already created!!")
 
 def main():
-
     create_BER_Table(code_name)
 
 
 if __name__ == "__main__":
-    
     main()
