@@ -129,8 +129,7 @@ def run_push_to_bq(drive_files_dict):
 
 #main function
 def main():
-    drive_files_dict = transfer_files_to_drive()
-    run_push_to_bq(drive_files_dict)
+    run_push_to_bq(transfer_files_to_drive())
 
 # main if needs to run separately
 if __name__ == "__main__":
