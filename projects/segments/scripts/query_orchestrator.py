@@ -207,7 +207,7 @@ def get_custom_query_params(query_name):
         raise NoFilterForPoiQuery("The POI query should have at least one filter")
 
 
-    return query_filters_str,query_dict["radius"]
+    return query_filters_str, query_dict["radius"]
 
     
 
