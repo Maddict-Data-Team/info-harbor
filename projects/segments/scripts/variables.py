@@ -15,7 +15,7 @@ table_mapping = {
 
 project = "maddictdata"
 dataset = "Back_End_Reports"
-dir_data = "scripts/segments/data"
+dir_data = "projects/segments/data"
 
 # Keys
 
