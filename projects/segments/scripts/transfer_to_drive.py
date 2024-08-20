@@ -5,9 +5,11 @@ import datetime
 import sys
 import os
 
+
+from oauth2client.service_account import ServiceAccountCredentials
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
-from oauth2client.service_account import ServiceAccountCredentials
+
 
 script_dir = os.path.dirname(__file__)
 project_root = os.path.abspath(os.path.join(script_dir, '..'))
@@ -16,13 +18,13 @@ sys.path.append(project_root)
 from input import *
 
 def find_or_create_folder(drive, parent_id, folder_name):
-    try:
+    if True:
         # Search for the folder
         file_list = drive.ListFile({
             'q': f"'{parent_id}' in parents and trashed=false and title='{folder_name}' and mimeType='application/vnd.google-apps.folder'", 
             'supportsAllDrives': True
         }).GetList()
-        
+            
         if file_list:
             # Folder found
             return file_list[0]['id']
@@ -37,9 +39,9 @@ def find_or_create_folder(drive, parent_id, folder_name):
             folder = drive.CreateFile(folder_metadata)
             folder.Upload()
             return folder['id']
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
+    # except Exception as e:
+    #     print(f"An error occurred: {e}")
+    #     return None
 
 
 # Create a folder on drive for the campaign segments
@@ -117,14 +119,14 @@ def transfer(drive, folder_id):
     return uploaded_ids
 
 
-def transfer_files_to_drive(drive):
+def transfer_files_to_drive():
     # Connect to drive
-    # scope = ["https://www.googleapis.com/auth/drive"]
-    # gauth = GoogleAuth()
-    # gauth.credentials = ServiceAccountCredentials.from_json_keyfile_name(
-    #     key_google_sheets, scope
-    # )
-    # drive = GoogleDrive(gauth)
+    scope = ["https://www.googleapis.com/auth/drive"]
+    gauth = GoogleAuth()
+    gauth.credentials = ServiceAccountCredentials.from_json_keyfile_name(
+        key_google_sheets, scope
+    )
+    drive = GoogleDrive(gauth)
 
     # Create folder
     folder_id = create_folder(drive, campaign_name, drive_link_folder_Adops)
