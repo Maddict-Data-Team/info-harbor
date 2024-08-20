@@ -38,11 +38,11 @@ def read_data_folder(country):
     exclude = set([])
 
     # iterate over the files in the "raw" directory
-    for file in os.listdir("scripts/segments/data/raw"):
+    for file in os.listdir("projects/segments/data/raw"):
         # skip files not from the intended country
         if country not in file: continue
         #open the file
-        with open("scripts/segments/data/raw/" + file) as inpf:
+        with open("projects/segments/data/raw/" + file) as inpf:
             #skip the title in the first line
             inpf.readline()
             #strip any spaces or new lines and save the DID in a set
@@ -117,7 +117,7 @@ def Write_output_to_files(sets, control, names):
     name_split = names[0].split("_")
     #open the file
     with open(
-        f"scripts/segments/data/controlled/{name_split[0]}_{name_split[1]}_controlled.csv", "w"
+        f"projects/segments/data/controlled/{name_split[0]}_{name_split[1]}_controlled.csv", "w"
     ) as outf:
         # write the column title
         outf.write("DID\n")
@@ -130,7 +130,7 @@ def Write_output_to_files(sets, control, names):
         # get the segment
         served = sets[i]
         # write into a file using the name on the same index 
-        with open("scripts/segments/data/served/" + names[i] + "_served.csv", "w") as outf:
+        with open("projects/segments/data/served/" + names[i] + "_served.csv", "w") as outf:
             # write the column title
             outf.write("DID\n")
             # write the lines
