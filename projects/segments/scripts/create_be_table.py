@@ -8,23 +8,23 @@ from google.oauth2.credentials import Credentials
 from variables import *
 from input import *
 
-# Authenticate with BigQuery
-credentials = service_account.Credentials.from_service_account_file(
-    key_bq,
-    scopes=[
-        "https://www.googleapis.com/auth/cloud-platform",
-        "https://www.googleapis.com/auth/drive",
-    ],
-)
+# # Authenticate with BigQuery
+# credentials = service_account.Credentials.from_service_account_file(
+#     key_bq,
+#     scopes=[
+#         "https://www.googleapis.com/auth/cloud-platform",
+#         "https://www.googleapis.com/auth/drive",
+#     ],
+# )
 
-bq_client = bigquery.Client(credentials=credentials, project=project)
+# bq_client = bigquery.Client(credentials=credentials, project=project)
 
-# Load credentials and create an authorized Google Drive service client
-creds = Credentials.from_authorized_user_file("token.json")
-service = build("drive", "v3", credentials=creds)
+# # Load credentials and create an authorized Google Drive service client
+# creds = Credentials.from_authorized_user_file("token.json")
+# service = build("drive", "v3", credentials=creds)
 
 
-def create_BER_Table(code):
+def create_BER_Table(code,bq_client):
     try:
         # Define BigQuery Table Schema
         schema = schema_back_end

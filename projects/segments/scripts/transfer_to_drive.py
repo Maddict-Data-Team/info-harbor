@@ -117,14 +117,14 @@ def transfer(drive, folder_id):
     return uploaded_ids
 
 
-def transfer_files_to_drive():
+def transfer_files_to_drive(drive):
     # Connect to drive
-    scope = ["https://www.googleapis.com/auth/drive"]
-    gauth = GoogleAuth()
-    gauth.credentials = ServiceAccountCredentials.from_json_keyfile_name(
-        key_google_sheets, scope
-    )
-    drive = GoogleDrive(gauth)
+    # scope = ["https://www.googleapis.com/auth/drive"]
+    # gauth = GoogleAuth()
+    # gauth.credentials = ServiceAccountCredentials.from_json_keyfile_name(
+    #     key_google_sheets, scope
+    # )
+    # drive = GoogleDrive(gauth)
 
     # Create folder
     folder_id = create_folder(drive, campaign_name, drive_link_folder_Adops)
