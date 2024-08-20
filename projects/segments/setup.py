@@ -21,7 +21,7 @@ def create_directory_structure(base_path):
 
 def main():
     # Define the base path
-    base_path = os.path.join('scripts', 'segments')
+    base_path = os.path.join('projects', 'segments')
     create_directory_structure(base_path)
 
 if __name__ == "__main__":
