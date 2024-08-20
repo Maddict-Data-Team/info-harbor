@@ -138,7 +138,7 @@ def transfer_files_to_drive():
         return None
 
 def main():
-    transferee_files_to_drive()
+    transfer_files_to_drive()
     
 if __name__ == "__main__":
     main()

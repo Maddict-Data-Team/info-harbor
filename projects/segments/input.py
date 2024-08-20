@@ -1,22 +1,22 @@
-code_name = "999" # 122
+code_name = "118" # 122
 
-campaign_name = "AnyName" # Redoxon
+campaign_name = "Grandiose-Q3" # Redoxon
 
-countries = ["BHR"] # "UAE", "KSA", "QAT"
+countries = ["UAE"] # "UAE", "KSA", "QAT"
 
-segments = ["Car Owners","HNWI"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
+segments = ["custom_Foodies"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
 dict_custom_segments = { 
-    # "custom_KFC stores":{
-    #     "type":"POI",
-    #     "General_Category":["food"],
-    #     "Category":["QSR","Restaurant"],
-    #     "Subcategory":["Chicken Restaurant"],
-    #     "GM_Subcategory":["Chicken restaurant"],
-    #     "Chain":["KFC"],
-    #     "radius":60
-    # },
+    "custom_Foodies":{
+        "type":"POI",
+        "General_Category":["Food"],
+        "Category":["Restaurant", 
+        "QSR",
+        "Fine Dining",
+        "Healthy Restaurant"],
+        "radius":80
+    }
     # "custom_Fine Dining Night Club":{
     #     "type":"POI",
     #     "General_Category":["food"],
@@ -26,7 +26,7 @@ dict_custom_segments = {
     # }
 }
 
-excluded_segments = ["custom_Fine Dining Night Club"] #  "Male"
+excluded_segments = [] #  "Male"
 
 controlled_size = 2000
-hg_radius = 3000
+# hg_radius = 3000
