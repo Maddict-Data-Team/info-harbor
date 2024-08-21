@@ -25,4 +25,4 @@ dict_custom_segments = {
 excluded_segments = [] #  "Male"
 
 controlled_size = 2000
-# hg_radius = 3000
+hg_radius = 3000
