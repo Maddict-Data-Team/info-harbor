@@ -23,13 +23,6 @@ def create_drive_service(secret_data_token_info):
     creds = Credentials.from_authorized_user_info(secret_data_token_info)
     return build("drive", "v3", credentials=creds)
 
-    # scope = ["https://www.googleapis.com/auth/drive"]
-    # gauth = GoogleAuth()
-    # gauth.credentials = Credentials.from_authorized_user_info(secret_data_token_info, scope
-    # )
-    # drive = GoogleDrive(gauth)
-
-    # return drive
 
 
 
