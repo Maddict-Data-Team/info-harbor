@@ -1,15 +1,12 @@
-# This code transfers the control and served segment to drive
-
 from variables import *
 import datetime
 import sys
 import os
-
+from tqdm import tqdm  # Import tqdm for the progress bar
 
 from oauth2client.service_account import ServiceAccountCredentials
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
-
 
 script_dir = os.path.dirname(__file__)
 project_root = os.path.abspath(os.path.join(script_dir, '..'))
@@ -39,10 +36,6 @@ def find_or_create_folder(drive, parent_id, folder_name):
             folder = drive.CreateFile(folder_metadata)
             folder.Upload()
             return folder['id']
-    # except Exception as e:
-    #     print(f"An error occurred: {e}")
-    #     return None
-
 
 # Create a folder on drive for the campaign segments
 def create_folder(drive, campaign_name, parent_link):
@@ -75,8 +68,7 @@ def create_folder(drive, campaign_name, parent_link):
     print(f"Campaign folder '{campaign_name}' created with ID: {campaign_folder_id}")
     return campaign_folder_id
 
-
-# Transfer the files
+# Transfer the files with progress tracking
 def transfer(drive, folder_id):
     """
     Transfer CSV files from local directory to a Google Drive folder.
@@ -89,7 +81,6 @@ def transfer(drive, folder_id):
     # Upload each CSV file in the directory to Google Drive
     uploaded_ids = {}
     for root, dirs, files in os.walk(dir_data):
-        # Iterate over the files
         for filename in files:
             # Skip the raw files
             if "raw" in root:
@@ -98,26 +89,43 @@ def transfer(drive, folder_id):
             if filename.endswith(".csv"):
                 file_path = os.path.join(root, filename)
 
-                # Create drive file object
-                file = drive.CreateFile(
-                    {
-                        "title": filename,
-                        "parents": [{"id": folder_id}],
-                        "mimeType": "text/csv",
-                        "supportsAllDrives": True
-                    }
-                )
-                # Set the path for the content of the file
-                file.SetContentFile(file_path)
-                # Upload the file
-                file.Upload()
+                # Track the number of lines in the file for progress
+                with open(file_path, 'r') as f:
+                    total_lines = sum(1 for _ in f)
+
+                # Initialize tqdm progress bar
+                with tqdm(total=total_lines, desc=f"Uploading {filename}", unit="line") as pbar:
+                    # Create drive file object
+                    file = drive.CreateFile(
+                        {
+                            "title": filename,
+                            "parents": [{"id": folder_id}],
+                            "mimeType": "text/csv",
+                            "supportsAllDrives": True
+                        }
+                    )
+                    # Set the path for the content of the file
+                    with open(file_path, 'r') as f:
+                        for line_number, line in enumerate(f, start=1):
+                            # Check if we should update the progress
+                            if line_number % 200000 == 0:
+                                pbar.update(200000)
+                            # Write the line to the Google Drive file object
+                            file.SetContentFile(file_path)
+
+                    # Upload the file after processing
+                    file.Upload()
+                    # Update for any remaining lines
+                    remaining = total_lines % 200000
+                    if remaining > 0:
+                        pbar.update(remaining)
+
                 # Save the id with the name in a dictionary for future use in creating big query tables
                 uploaded_ids[file["id"]] = filename[:-4]
                 print(f"Uploaded {filename} to Google Drive")
 
     print("All files uploaded successfully.")
     return uploaded_ids
-
 
 def transfer_files_to_drive():
     # Connect to drive

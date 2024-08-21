@@ -181,7 +181,7 @@ def run_query_behavior(segment,bq_client,country,codename=0):
 
     query = build_query(query,country, codename, radius, segment,q_filters)
 
-    print(query)
+
     rows = run_query_get_res(query,bq_client)
     return rows
 

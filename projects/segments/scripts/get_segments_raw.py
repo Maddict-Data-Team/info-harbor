@@ -1,4 +1,3 @@
-# this code gets the raw segments from Big Query
 from google.cloud import bigquery
 from google.oauth2 import service_account
 import datetime
@@ -8,10 +7,11 @@ import query_orchestrator
 from tqdm import tqdm  # Import tqdm for the progress bar
 
 from variables import *
+
 # Get the path to the directory containing this script (main.py)
 script_dir = os.path.dirname(__file__)
 
-# Get the parent directory of 'scripts'
+# Get the parent directory to 'scripts'
 project_root = os.path.abspath(os.path.join(script_dir, '..'))
 
 # Add the parent directory to sys.path
@@ -32,24 +32,31 @@ def get_raw_segments(countries, segments, bq_client):
                 if "custom" in segment:
                     segment = segment.split("_", 1)[1]
 
-                print(f"Query for {country} - {segment} added to BigQuery dataset {dataset_campaign_segments}")
+                # print(f"Query for {segment}-{country} added to BigQuery dataset {dataset_campaign_segments}")
                 now = datetime.datetime.now().strftime("%Y%m%d")
                 segment_name = segment.replace(" ", "_")
-                #segment_name = segment.replace("/", "-")
+                
                 row_count = 0
-                with open(f"projects/segments/data/raw/{code_name}_{country}_{segment_name}_{now}.csv", 'a') as outf:
-                    outf.write("DID\n")
-                    for row in rows:
-                        row_count += 1
-                        if row_count % 200000 == 0:
-                            print("downloaded ", row_count, " DIDs")
-                        did = row.DID
-                        outf.write(f"{did}\n")
+                with tqdm(desc=f"Downloading DIDs for {segment} - {country}", unit=" DID", leave=False) as pbar:
+                    with open(f"projects/segments/data/raw/{code_name}_{country}_{segment_name}_{now}.csv", 'a') as outf:
+                        outf.write("DID\n")
+                        for row in rows:
+                            row_count += 1
+                            did = row.DID
+                            outf.write(f"{did}\n")
+                            
+                            if row_count % 50000 == 0:
+                                pbar.update(50000)  # Update tqdm for every 50,000 segments
+
+                        # Update the remaining rows if they don't add up to 50,000
+                        remaining = row_count % 50000
+                        if remaining > 0:
+                            pbar.update(remaining)
             else:
                 print(f"No mapping found for country: {country}")
 
 def main():
-    get_raw_segments(countries, segments)
+    get_raw_segments(countries, segments, bq_client)
 
 if __name__ == "__main__":
     main()

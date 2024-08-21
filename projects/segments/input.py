@@ -1,18 +1,18 @@
-code_name = "118" # 122
+code_name = "998" # 122
 
-campaign_name = "Grandiose-Q3" # Redoxon
+campaign_name = "TEST-TRACK" # Redoxon
 
-countries = ["UAE"] # "UAE", "KSA", "QAT"
+countries = ["QAT"] # "UAE", "KSA", "QAT"
 
-segments = ["custom_Competitors"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
+segments = ["Diabetes Patients", "Airport Frequenters", "ATM Users"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
 dict_custom_segments = { 
-    "custom_Competitors":{
-        "type":"POI",
-        "Chain":["Lulu", "LuLu Market", "Lulu Market", "LuLu Hypermarket", "Carrefour", "Union Coop"],
-        "radius":150
-    },
+    # "custom_Competitors":{
+    #     "type":"POI",
+    #     "Chain":["Lulu", "LuLu Market", "Lulu Market", "LuLu Hypermarket", "Carrefour", "Union Coop"],
+    #     "radius":150
+    # },
     # "custom_Fine Dining Night Club":{
     #     "type":"POI",
     #     "General_Category":["food"],
