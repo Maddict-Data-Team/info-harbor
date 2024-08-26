@@ -157,6 +157,16 @@ def build_query(
         query = union_query
     return query
 
+def get_campaign_tracker_data(codename, config, bq_client):
+    # Get the raw metadata query
+    query_metadata_raw = config.get("Setup", "query_metadata")
+    # Build te query
+    query_metadata = build_query(query_metadata_raw, codename)
+    # run the query and retreive the results
+    metadata_raw = run_query_get_res(query_metadata, bq_client)
+    # extract the list of countries
+
+    return metadata_raw
 
 def get_metadata(codename, config, bq_client):
     """Query the tracher table using th ecodename to get the pipeline metadata
@@ -174,13 +184,7 @@ def get_metadata(codename, config, bq_client):
 
     """
 
-    # Get the raw metadata query
-    query_metadata_raw = config.get("Setup", "query_metadata")
-    # Build te query
-    query_metadata = build_query(query_metadata_raw, codename)
-    # run the query and retreive the results
-    metadata_raw = run_query_get_res(query_metadata, bq_client)
-    # extract the list of countries
+    metadata_raw = get_campaign_tracker_data(codename, config, bq_client)
     countries = []
     for row in metadata_raw:
         countries.append(row.country)
