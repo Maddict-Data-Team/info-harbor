@@ -93,7 +93,7 @@ def query_bigquery_and_process(code_name):
 
 
 def main():
-    query_bigquery_and_process(120)
+    query_bigquery_and_process(119)
 
 
 if __name__ == "__main__":

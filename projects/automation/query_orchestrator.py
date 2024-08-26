@@ -202,6 +202,7 @@ def get_metadata(codename, config, bq_client):
     backend_report = row.backend_report
     # Get the field that indicates if there are segments
     segments =  row.segments
+    
     if pipeline_type == "Placelift Report" or pipeline_type == "Placelift Dashboard" or pipeline_type == "Placelift":
         if segments == 0:
             pipeline_type = "Placelift No Segments"
@@ -259,7 +260,7 @@ def run_pipeline_queries(
     return:
         radiuses: list of radiuses.
     """
-    print("Stared with the queries")
+    print("Started with the queries:\n")
     # Read the query list from the config file for the given pipeline type
     queries = config.get(pipeline_type, "queries").split(",")
     # Loop over the list of query names
