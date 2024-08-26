@@ -9,6 +9,7 @@ table_mapping = {
     "KWT": "POI_DB_KWT",
     "OMN": "POI_DB_OMN",
     "BHR": "POI_DB_BHR",
+    "EGY": "POI_DB_EGP",
 }
 
 # Folders

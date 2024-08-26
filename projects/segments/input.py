@@ -1,18 +1,18 @@
-code_name = "998" # 122
+code_name = "9999" # 122
 
-campaign_name = "TEST-TRACK" # Redoxon
+campaign_name = "Magnite massive media" # Redoxon
 
-countries = ["QAT"] # "UAE", "KSA", "QAT"
+countries = ["EGY"] # "UAE", "KSA", "QAT"
 
-segments = ["Diabetes Patients", "Airport Frequenters", "ATM Users"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
+segments = ["custom_Business"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
 dict_custom_segments = { 
-    # "custom_Competitors":{
-    #     "type":"POI",
-    #     "Chain":["Lulu", "LuLu Market", "Lulu Market", "LuLu Hypermarket", "Carrefour", "Union Coop"],
-    #     "radius":150
-    # },
+    "custom_Business":{
+        "type":"POI",
+        "General_Category":["Business"],
+        "radius":60
+    },
     # "custom_Fine Dining Night Club":{
     #     "type":"POI",
     #     "General_Category":["food"],
