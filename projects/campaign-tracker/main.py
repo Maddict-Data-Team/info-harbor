@@ -19,6 +19,17 @@ def metadata_placelift():
     # Initialize the BigQuery client
     client = create_client()
 
+    # Fetch the last code name from the table
+    query_last_code_name = f"""
+        SELECT MAX(code_name) AS last_code_name
+        FROM `{project}.{dataset_metadata}.{tbl_campaign_tracker}`;
+    """
+    last_code_name_result = client.query(query_last_code_name).result()
+    last_code_name = next(last_code_name_result).last_code_name
+
+    # It will increment the code name
+    new_code_name = last_code_name + 1 
+    
     # Generate and execute queries
     for index, country in enumerate(countries):
         if country in table_mapping:
@@ -26,7 +37,8 @@ def metadata_placelift():
             backend_report = backend_reports[index]
             # Generate the query string
             query = f"""INSERT INTO
-                        {project}.{dataset_metadata}.{tbl_campaign_tracker} ( id,
+                        {project}.{dataset_metadata}.{tbl_campaign_tracker} (
+                            id,
                             code_name,
                             campaign_name,
                             start_date,
@@ -37,10 +49,10 @@ def metadata_placelift():
                             backend_report,
                             last_update,
                             time_interval
-                            )
+                        )
                         SELECT
                         COALESCE(MAX(id), 0) + 1,
-                        {code_name},
+                        {new_code_name},
                         '{campaign_name}',
                         DATE '{start_date}',
                         DATE '{end_date}',
@@ -49,26 +61,16 @@ def metadata_placelift():
                         '{type}',
                         {backend_report},
                         TIMESTAMP '{start_date}',
-                        {time_interval},
+                        {time_interval}
                         FROM
                         `maddictdata.Metadata.Campaign_Tracker`;"""
 
-            # print(
-            #     f"Query for {campaign_name} - {country} added to BigQuery dataset {dataset_campaign_segments}"
-            # )
+            # Execute the query
+            client.query(query)
 
-        else:
-            print(f"No mapping found for country: {country}")
 
-        # Execute the query
-        query_job = client.query(query)
-
-        # Wait for the query to complete
-        rows = query_job.result()
-
-        print(
-            f"{campaign_name} - {countries[index]} added to {tbl_campaign_tracker}"
-        )
+        # Log the new code name for the campaign
+        print(f"New code name {new_code_name} assigned to campaign {campaign_name} - {countries[index]}")
 
 
 def main():
