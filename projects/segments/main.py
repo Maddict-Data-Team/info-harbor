@@ -26,11 +26,11 @@ from create_be_table import create_BER_Table
 def main():
 
     bq_client, drive_service = authenticate_get_clients()
-    # reset_folders()
+    reset_folders()
     get_raw_segments (countries, segments, bq_client)
-    # split_files()
-    # run_push_to_bq(transfer_files_to_drive(), bq_client)
-    # create_BER_Table(code_name,bq_client)
+    split_files()
+    run_push_to_bq(transfer_files_to_drive(), bq_client)
+    create_BER_Table(code_name,bq_client)
     
 if __name__ == "__main__":
     main()
