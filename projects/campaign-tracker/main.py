@@ -48,7 +48,8 @@ def metadata_placelift():
                             type,
                             backend_report,
                             last_update,
-                            time_interval
+                            time_interval,
+                            segments
                         )
                         SELECT
                         COALESCE(MAX(id), 0) + 1,
@@ -61,7 +62,8 @@ def metadata_placelift():
                         '{type}',
                         {backend_report},
                         TIMESTAMP '{start_date}',
-                        {time_interval}
+                        {time_interval},
+                        {has_segments}
                         FROM
                         `maddictdata.Metadata.Campaign_Tracker`;"""
 
