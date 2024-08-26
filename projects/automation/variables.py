@@ -28,9 +28,9 @@ dataset_campaign_segments = "Placelift_Campaign_Segments"
 dataset_Districts = "District_Mapping"
 dataset_HWG = "Automated_HWG"
 dataset_mt_Placelift = "maddictdata.Metadata.Placelift"
-table_HG = "Home_Graph_Cumulative"
-
 dataset_metadata = "Metadata"
+
+table_HG = "Home_Graph_Cumulative"
 tbl_cmpgn_tracker = "Campaign_Tracker"
 tbl_cmpgn_test = "test"
 table_behavior_lookup = "Lookup_Behavior"
