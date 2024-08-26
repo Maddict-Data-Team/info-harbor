@@ -11,3 +11,5 @@ type = "Placelift Dashboard" # Dashboard or Placelift
 backend_reports = [0]
 
 time_interval = 7
+
+has_segments = 0
