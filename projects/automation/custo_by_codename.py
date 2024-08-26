@@ -92,10 +92,9 @@ def query_bigquery_and_process(code_name):
     return "Main Automation Done!"
 
 
-def main(code_name):
-    query_bigquery_and_process(code_name)
+def main():
+    query_bigquery_and_process(120)
 
 
 if __name__ == "__main__":
-    code_name = "9999"
-    main(code_name)
+    main()
