@@ -301,7 +301,7 @@ def run_pipeline_queries(
         # Run the query and save the result in the destination table
         run_query_save_table(parsed_query, destination, bq_client, in_write_disposition)
         print("Finished Query: ", query_name)
-        print("-------------------------------------------------")
+        print("-------------------------------------------------\n")
 
 
 def get_run_dates(end_date, last_update, interval):
