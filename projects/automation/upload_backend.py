@@ -59,9 +59,13 @@ def navigate_and_search_file(
             "id"
         ]  # Assuming list_folders_inside returns a similar structure
 
-    matching_files = search_files_in_folder(drive_service, month_folder_id, backend_report)
+    matching_files = search_files_in_folder(
+        drive_service, month_folder_id, backend_report
+    )
     if not matching_files:
-        print(f"No files starting with '{backend_report}' found in folder '{month_name}'.")
+        print(
+            f"No files starting with '{backend_report}' found in folder '{month_name}'."
+        )
         return 0
     else:
         print(f"Files starting with '{backend_report}' found in folder '{month_name}':")
@@ -181,6 +185,7 @@ def delete_table(backend_report, bq_client):
 
     # Delete the table
     bq_client.delete_table(table_ref, not_found_ok=True)
+
 
 # code_name
 def main(drive_service, bq_client, backend_report, code_name):

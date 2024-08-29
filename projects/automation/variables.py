@@ -52,7 +52,7 @@ schema_back_end = [
     bigquery.SchemaField("LINE", "STRING"),
     bigquery.SchemaField("TIMESTAMP", "TIMESTAMP"),
     bigquery.SchemaField("req_id", "STRING"),
-    bigquery.SchemaField("udid", "STRING"),
+    bigquery.SchemaField("udid_idfa", "STRING"),
     bigquery.SchemaField("devraw", "STRING"),
     bigquery.SchemaField("country", "STRING"),
     bigquery.SchemaField("city", "STRING"),
@@ -112,7 +112,7 @@ country_id_dict = {
 # Campaign Tracker
 
 q_update_status = f"""
-UPDATE `maddictdata.Metadata.{tbl_cmpgn_test}`
+UPDATE `maddictdata.Metadata.{tbl_cmpgn_tracker}`
 SET status = CASE
     WHEN CURRENT_DATE() BETWEEN start_date + 9 AND end_date + 9 THEN 'Active'
     WHEN CURRENT_DATE() < start_date + 9 THEN 'Validation'
@@ -125,7 +125,7 @@ q_select_active_interval = f"""SELECT
   code_name,
   backend_report
 FROM
-  `maddictdata.Metadata.{tbl_cmpgn_test}`
+  `maddictdata.Metadata.{tbl_cmpgn_tracker}`
 WHERE
   ( status = 'Active'
     AND time_interval > 0
@@ -134,16 +134,16 @@ WHERE
     AND DATE_SUB(CURRENT_DATE(), INTERVAL 9 DAY) >= DATE(end_date) );"""
   
 
-q_select_by_codename = """SELECT
-  code_name,
-  backend_report
-  FROM
-  `maddictdata.Metadata.{campaign_tracker_table}`
-  where 
-  code_name = {codename}
+# q_select_by_codename = """SELECT
+#   code_name,
+#   backend_report
+#   FROM
+#   `maddictdata.Metadata.{campaign_tracker_table}`
+#   where 
+#   code_name = {codename}
+# """
 
 
-"""
 # Main Queries
 
 #########################
