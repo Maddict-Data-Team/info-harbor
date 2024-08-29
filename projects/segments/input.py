@@ -1,4 +1,4 @@
-code_name = "9999" # 122
+code_name = "118" # 122
 
 campaign_name = "Grand Wagoneer" # Redoxon
 
