@@ -1,8 +1,9 @@
 import configparser
 from variables import *
-from datetime import datetime,timedelta
+from datetime import datetime, timedelta
 import traceback
 import os
+
 
 def run_query(query, bq_client):
     """Run a query
@@ -86,7 +87,7 @@ def read_config():
     Return:
         config: parsed .ini file
     """
-    #get the absolute directory of the current script
+    # get the absolute directory of the current script
     script_dir = os.path.dirname(__file__)
     # the relative path to the configuration
     rel_path = "queries.ini"
@@ -99,7 +100,13 @@ def read_config():
 
 
 def build_query(
-    query, codename, start_date_q="", end_date_q="", countries=[], radiuses=[], custom_replace_dict={}
+    query,
+    codename,
+    start_date_q="",
+    end_date_q="",
+    countries=[],
+    radiuses=[],
+    custom_replace_dict={},
 ):
     """This function builds the query by replacing the placeholders with the necessary
     strings, and sets up some queries with union in case of multiple country input
@@ -127,7 +134,7 @@ def build_query(
 
     # set last_update as now if available
     now = datetime.now()
-    query = query.replace("{new_last_update}",str(now))
+    query = query.replace("{new_last_update}", str(now))
 
     # If there is a country placeholder there should be a union repeating the query for each country
     # This is done because countries each have separate tables.
@@ -157,6 +164,7 @@ def build_query(
         query = union_query
     return query
 
+
 def get_campaign_tracker_data(codename, config, bq_client):
     # Get the raw metadata query
     query_metadata_raw = config.get("Setup", "query_metadata")
@@ -167,6 +175,7 @@ def get_campaign_tracker_data(codename, config, bq_client):
     # extract the list of countries
 
     return metadata_raw
+
 
 def get_metadata(codename, config, bq_client):
     """Query the tracher table using th ecodename to get the pipeline metadata
@@ -201,9 +210,13 @@ def get_metadata(codename, config, bq_client):
     # Extract the pipeline type
     backend_report = row.backend_report
     # Get the field that indicates if there are segments
-    segments =  row.segments
-    
-    if pipeline_type == "Placelift Report" or pipeline_type == "Placelift Dashboard" or pipeline_type == "Placelift":
+    segments = row.segments
+
+    if (
+        pipeline_type == "Placelift Report"
+        or pipeline_type == "Placelift Dashboard"
+        or pipeline_type == "Placelift"
+    ):
         if segments == 0:
             pipeline_type = "Placelift No Segments"
         elif backend_report == 0:
@@ -296,12 +309,12 @@ def run_pipeline_queries(
         # In all queries except visitors the table should be entirely replaced
         in_write_disposition = "WRITE_TRUNCATE"
         if query_name == "visitors":
-           in_write_disposition = "WRITE_APPEND"
-        
+            in_write_disposition = "WRITE_APPEND"
+
         # Run the query and save the result in the destination table
         run_query_save_table(parsed_query, destination, bq_client, in_write_disposition)
         print("Finished Query: ", query_name)
-        print("-------------------------------------------------\n")
+        print("\n-------------------------------------------------\n")
 
 
 def get_run_dates(end_date, last_update, interval):
@@ -309,9 +322,8 @@ def get_run_dates(end_date, last_update, interval):
     last_update = datetime(last_update.year, last_update.month, last_update.day)
     today = datetime.today()
 
-
     end_date_q = today - timedelta(days=9)
-    
+
     end_date_p7 = end_date + timedelta(days=7)
 
     if end_date_q > end_date_p7:
@@ -319,12 +331,13 @@ def get_run_dates(end_date, last_update, interval):
 
     return last_update.strftime("%Y-%m-%d"), end_date_q.strftime("%Y-%m-%d")
 
-def update_last_update(config,codename,bq_client):
-    
-    query = config.get("Setup", "update_last_update")
-    query = build_query(query,codename)
 
-    run_query(query,bq_client)
+def update_last_update(config, codename, bq_client):
+
+    query = config.get("Setup", "update_last_update")
+    query = build_query(query, codename)
+
+    run_query(query, bq_client)
 
 
 def run_by_codename(codename, bq_client):
@@ -336,7 +349,7 @@ def run_by_codename(codename, bq_client):
         Nothing
     """
     try:
-            
+
         # read configuration file
         config = read_config()
         print("Read the ini file")
@@ -361,10 +374,9 @@ def run_by_codename(codename, bq_client):
             pipeline_type,
             bq_client,
             radiuses,
-        )  
-        
+        )
 
-        update_last_update(config,codename,bq_client)
+        update_last_update(config, codename, bq_client)
     except:
         traceback.print_exc()
         return "error"
