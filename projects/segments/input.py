@@ -1,10 +1,10 @@
 code_name = "9999" # 122
 
-campaign_name = "Magnite massive media" # Redoxon
+campaign_name = "Grand Wagoneer" # Redoxon
 
-countries = ["EGY"] # "UAE", "KSA", "QAT"
+countries = ["UAE","KSA","QAT","KWT"] # "UAE", "KSA", "QAT"
 
-segments = ["custom_Business"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
+segments = ["Young Cosmopolitans","Potential Car Buyers","HNWI"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
 dict_custom_segments = { 
