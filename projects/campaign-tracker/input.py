@@ -1,10 +1,10 @@
-campaign_name = "The North Face" # MyNameIsJeff
+campaign_name = "Timberland" # MyNameIsJeff
 
-countries = ["KSA"] # "UAE" ,"KSA"
+countries = ["UAE"] # "UAE" ,"KSA"
 
-start_date = "2024-08-09" # "2024-06-10"
+start_date = "2024-08-13" # "2024-06-10"
 
-end_date = "9999-12-31" # "2024-06-30"
+end_date = "2024-09-15" # "2024-06-30"
 
 type = "Placelift Dashboard" # Dashboard or Placelift
 

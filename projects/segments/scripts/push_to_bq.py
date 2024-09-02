@@ -30,7 +30,7 @@ def create_Combined_table(country, bq_client):
     try:
         # create a table ref object
         table_ref = bq_client.dataset(dataset_campaign_segments).table(
-            f"{code_name}_{country}_Segments"
+            f"{code_name}_Segments"
         )
         # provide the table ref and the schema to create a table object
         table = bigquery.Table(table_ref, schema=schema_Combined)
@@ -38,7 +38,7 @@ def create_Combined_table(country, bq_client):
         bq_client.create_table(table)
     except:
         print(
-            f"{code_name}_{country}_Segments was already created. If not intended, delete the table and run again"
+            f"{code_name}_Segments was already created. If not intended, delete the table and run again"
         )
 
 
@@ -63,7 +63,7 @@ def insert_to_combined(table_name, bq_client):
 
     # create the query for the insert
     query = f"""
-    Insert INTO {project}.{dataset_campaign_segments}.{code_name}_{country}_Segments
+    Insert INTO {project}.{dataset_campaign_segments}.{code_name}_Segments
     (DID,Segment,Country,Controlled)
     (
         Select DID,'{Segment}','{country}',{control}

@@ -4,7 +4,7 @@ import sys
 
 from variables import *
 import random
-
+import shutil
 
 # Get the path to the directory containing this script (main.py)
 script_dir = os.path.dirname(__file__)
@@ -150,7 +150,14 @@ def split_files():
         )  # exclude control from the segment
         Write_output_to_files(sets, controlled_segment, names)  # write segments to files
 
-
+def move_without_splitting():
+    # iterate over the raw files
+    for file in os.listdir("projects/segments/data/raw"):
+        
+        #move the files to the served folder so they could be uploaded to drive
+        curr = "projects/segments/data/raw/" + file
+        dest = "projects/segments/data/served/" + file
+        shutil.move(curr,dest)
 
 if __name__ == "__main__":
     split_files()

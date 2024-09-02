@@ -106,7 +106,8 @@ def build_query(
     end_date_q="",
     countries=[],
     radiuses=[],
-    custom_replace_dict={},
+    start_date_before = "", 
+    end_date_before = ""
 ):
     """This function builds the query by replacing the placeholders with the necessary
     strings, and sets up some queries with union in case of multiple country input
@@ -132,6 +133,12 @@ def build_query(
     # Set the end date of the query
     query = query.replace("{end_date_q}", end_date_q)
 
+    # Set the start date of the query
+    query = query.replace("{start_date_before}", start_date_before)
+    # Set the end date of the query
+    query = query.replace("{end_date_before}", end_date_before)
+
+    
     # set last_update as now if available
     now = datetime.now()
     query = query.replace("{new_last_update}", str(now))
@@ -201,6 +208,8 @@ def get_metadata(codename, config, bq_client):
     # The following metadata are the same for all rows of a certain codename
     # Extract end date
     end_date = row.end_date
+    # Extract start date
+    start_date = row.start_date
     # Extract the pipeline type
     pipeline_type = row.type
     # Extract the interval
@@ -224,7 +233,7 @@ def get_metadata(codename, config, bq_client):
         else:
             pipeline_type = "Placelift"
 
-    return countries, pipeline_type, end_date, interval, last_update
+    return countries, pipeline_type, end_date, interval, last_update, start_date
 
 
 def get_radiuses(codename, config, bq_client):
@@ -260,6 +269,8 @@ def run_pipeline_queries(
     pipeline_type,
     bq_client,
     radiuses,
+    start_date_before = "", 
+    end_date_before = ""
 ):
     """Builds and runs the necessary queries for a given pipeline type
     parameters:
@@ -299,7 +310,7 @@ def run_pipeline_queries(
         query_raw = config.get(pipeline_type, query_name)
         # Build the query from the raw
         parsed_query = build_query(
-            query_raw, codename, start_date_q, end_date_q, countries, radiuses
+            query_raw, codename, start_date_q, end_date_q, countries, radiuses, start_date_before, end_date_before
         )
         # Set the destiation table using the codename and query name
         destination = f"{project}.{dataset_footfall}.{codename}_{query_name}"
@@ -317,8 +328,9 @@ def run_pipeline_queries(
         print("\n-------------------------------------------------\n")
 
 
-def get_run_dates(end_date, last_update, interval):
+def get_run_dates(end_date, last_update,start_date,interval):
     end_date = datetime(end_date.year, end_date.month, end_date.day)
+    start_date = datetime(start_date.year, start_date.month, start_date.day)
     last_update = datetime(last_update.year, last_update.month, last_update.day)
     today = datetime.today()
 
@@ -329,7 +341,20 @@ def get_run_dates(end_date, last_update, interval):
     if end_date_q > end_date_p7:
         end_date_q = end_date_p7
 
-    return last_update.strftime("%Y-%m-%d"), end_date_q.strftime("%Y-%m-%d")
+    start_date_q = last_update - timedelta(days=9)
+
+    if start_date_q < start_date:
+        start_date_q = start_date
+
+    end_date_before = start_date
+    # start_date_before = end_date_before
+
+    delta = end_date_q - start_date
+
+    start_date_before = start_date - timedelta(days=delta.days)
+
+
+    return start_date_q.strftime("%Y-%m-%d"), end_date_q.strftime("%Y-%m-%d"),start_date_before.strftime("%Y-%m-%d"), end_date_before.strftime("%Y-%m-%d")
 
 
 def update_last_update(config, codename, bq_client):
@@ -354,16 +379,18 @@ def run_by_codename(codename, bq_client):
         config = read_config()
         print("Read the ini file")
         # Retreive necessary metadata parameters
-        countries, pipeline_type, end_date, interval, last_update = get_metadata(
+        countries, pipeline_type, end_date, interval, last_update,start_date = get_metadata(
             codename, config, bq_client
         )
         # # Get the list of radiuses used
         radiuses = get_radiuses(codename, config, bq_client)
         # Get dates for the current run
-        start_date_q, end_date_q = get_run_dates(end_date, last_update, interval)
+        start_date_q, end_date_q,start_date_before, end_date_before = get_run_dates(end_date, last_update,start_date,interval)
         print("Got the metadata")
 
-        print(start_date_q, end_date_q)
+        # print(start_date)
+        # print(start_date_q, end_date_q)
+        # print(start_date_before, end_date_before)
         # Run the pipeline using the metadata parameters
         run_pipeline_queries(
             config,
@@ -374,6 +401,8 @@ def run_by_codename(codename, bq_client):
             pipeline_type,
             bq_client,
             radiuses,
+            start_date_before, 
+            end_date_before
         )
 
         update_last_update(config, codename, bq_client)
