@@ -3,7 +3,7 @@ name: Deploy Cloud Function
 on:
   push:
     branches:
-      - main  # Runs the action on push to the main branch
+      - main  # Deploys when you push to the main branch
 
 jobs:
   deploy:
@@ -26,9 +26,9 @@ jobs:
     - name: Deploy Cloud Function
       run: |
         gcloud functions deploy run_xtest_function \
-          --runtime python39 \
+          --runtime python312 \
           --trigger-http \
           --allow-unauthenticated \
-          --source projects/automation \  # This points to the correct directory
-          --entry-point run_xtest  # The entry point function defined in main.py
-          --region us-central1  # Set the region for the Cloud Function
+          --source projects/automation \
+          --entry-point run_xtest \
+          --region us-central1
