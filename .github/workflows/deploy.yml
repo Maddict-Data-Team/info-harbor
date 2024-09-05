@@ -30,5 +30,5 @@ jobs:
           --trigger-http \
           --allow-unauthenticated \
           --source projects/automation \  # This points to the correct directory
-          --entry-point run_xtest  # The entry point function in main.py
-          --region your-region  # Replace with your GCP region
+          --entry-point run_xtest  # The entry point function defined in main.py
+          --region us-central1  # Set the region for the Cloud Function
