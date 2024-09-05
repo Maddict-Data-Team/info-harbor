@@ -70,14 +70,20 @@ def navigate_and_search_file(
     else:
         print(f"Files starting with '{backend_report}' found in folder '{month_name}':")
 
+        used_folder_id_list = []
         moved_file_ids = []  # List to store IDs of files successfully moved
         for file in matching_files:
             moved_file_ids.append(
                 file["id"]
-            )  # Update with the ID of the last file successfully moved
+            ) 
+            used_folder_id_list.append(
+                used_folder_id
+            ) 
+                
+                # Update with the ID of the last file successfully moved
             # return file["id"]
 
-        return moved_file_ids,matching_files,used_folder_id
+        return moved_file_ids,matching_files,used_folder_id_list
 
 
 
@@ -189,7 +195,7 @@ def delete_table(backend_report, bq_client):
 # code_name
 def main(drive_service, bq_client, backend_report, code_name):
 
-    get_file_id,matching_files,used_folder_id = navigate_and_search_file(
+    get_file_id,matching_files,used_folder_id_list = navigate_and_search_file(
         drive_service, folder_id_Backend_Reports, backend_report
     )
     print(get_file_id)
@@ -201,7 +207,7 @@ def main(drive_service, bq_client, backend_report, code_name):
         # Get the last day of the previous month by subtracting current day from today
         last_month_date = today - timedelta(days=today.day)
         last_month = last_month_date.strftime("%B")
-        get_file_id_last_month,matching_files_last_month,used_folder_id = navigate_and_search_file(
+        get_file_id_last_month,matching_files_last_month,used_folder_id_list_last_month = navigate_and_search_file(
             drive_service, folder_id_Backend_Reports, backend_report, last_month
         )
 
@@ -215,6 +221,7 @@ def main(drive_service, bq_client, backend_report, code_name):
 
             get_file_id.extend(get_file_id_last_month)
             matching_files.extend(matching_files_last_month)
+            used_folder_id_list.extend(used_folder_id_list_last_month)
 
     if get_file_id:
         print(f"Moved files: {get_file_id}")
@@ -229,8 +236,9 @@ def main(drive_service, bq_client, backend_report, code_name):
         for i in range(0,len(get_file_id)):
             curr_id = get_file_id[i]
             curr_drive_file = matching_files[i]
+            used_folder_id = used_folder_id_list[i]
             print(f"Inserting: {backend_report} into {code_name} BER table")
-            insert_new_BER(curr_id, backend_report, bq_client, code_name)
+            # insert_new_BER(curr_id, backend_report, bq_client, code_name)
             print(f"Moving file: {curr_drive_file['name']} to 'Used' folder")
             move_file_to_folder(drive_service, curr_drive_file["id"], used_folder_id)
 

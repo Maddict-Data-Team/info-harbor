@@ -103,12 +103,6 @@ static_query_replace = {
     "{tbl_cmpgn_test}":tbl_cmpgn_test
 }
 
-country_id_dict = {
-    "UAE":"1",
-    "KSA":"2",
-    "KWT":"3"}
-
-
 # Campaign Tracker
 
 q_update_status = f"""
