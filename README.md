@@ -18,6 +18,7 @@ What things you need to install the software and how to install them.
 - Completion Period
 - Finished
 - Error (Special Case)
+- On Hold (Special Case)
 
 ## Features
 

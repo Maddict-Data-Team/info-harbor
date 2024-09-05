@@ -119,7 +119,7 @@ SET status = CASE
     WHEN CURRENT_DATE() > end_date + 9 THEN 'Completion Period'
     ELSE status
 END
-WHERE status NOT IN ('Finished');"""
+WHERE status NOT IN ('Finished', 'On Hold');"""
 
 q_select_active_interval = f"""SELECT
   code_name,
