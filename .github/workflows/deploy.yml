@@ -1,0 +1,34 @@
+name: Deploy Cloud Function
+
+on:
+  push:
+    branches:
+      - main  # Runs the action on push to the main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout the code
+      uses: actions/checkout@v2
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+      with:
+        version: 'latest'
+
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+    - name: Deploy Cloud Function
+      run: |
+        gcloud functions deploy run_xtest_function \
+          --runtime python39 \
+          --trigger-http \
+          --allow-unauthenticated \
+          --source projects/automation \  # This points to the correct directory
+          --entry-point run_xtest  # The entry point function in main.py
+          --region your-region  # Replace with your GCP region
