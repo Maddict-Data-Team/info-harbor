@@ -30,5 +30,5 @@ jobs:
           --trigger-http \
           --allow-unauthenticated \
           --source projects/automation \
-          --entry-point main \
+          --entry-point run_xtest \
           --region us-central1
