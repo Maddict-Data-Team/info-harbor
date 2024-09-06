@@ -7,3 +7,5 @@ google-cloud-core==2.4.1
 google-cloud-secret-manager==2.18.3
 requests==2.31.0
 httplib2==0.22.0
+pandas==2.1.1
+tqdm==4.65.0
