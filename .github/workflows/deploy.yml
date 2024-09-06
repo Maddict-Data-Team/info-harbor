@@ -25,10 +25,11 @@ jobs:
 
     - name: Deploy Cloud Function
       run: |
-        gcloud functions deploy run_xtest_function \
+        gcloud functions deploy ih-cf-executor \
           --runtime python312 \
           --trigger-http \
-          --allow-unauthenticated \
           --source projects/automation \
           --entry-point main \
+          --service-account dev-cloud-function-2024@maddictdata.iam.gserviceaccount.com \
           --region us-central1
+
