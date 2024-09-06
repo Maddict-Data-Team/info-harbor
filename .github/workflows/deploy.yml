@@ -25,10 +25,10 @@ jobs:
 
     - name: Deploy Cloud Function
       run: |
-        gcloud functions deploy ih-cf-executor \
+        gcloud functions deploy run_xtest_function \
           --runtime python312 \
           --trigger-http \
           --allow-unauthenticated \
           --source projects/automation \
-          --entry-point run_xtest \
+          --entry-point main \
           --region us-central1
