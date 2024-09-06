@@ -11,8 +11,8 @@ folder_id_Backend_Reports = "1vKOH8eDs92jHSaGyPILAa9p3qH8YUHNo"
 
 # Secret Manager
 
-secret_ber = f"projects/449251366155/secrets/token-ber"
-secret_bq = f"projects/449251366155/secrets/secret-bq"
+secret_ber = f"projects/maddictdata/secrets/token-ber/versions/latest"
+secret_bq = f"projects/maddictdata/secrets/secret-bq/versions/latest"
 
 # Keys
 
