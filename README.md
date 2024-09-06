@@ -1,6 +1,6 @@
 # Overview
 
-One Paragraph of project description goes here. Explain what your project does and what it's for in a few sentences.
+This is one of the biggest projects at Maddict and it is resposible for the workflow of the campaigns. This project is cut into three parts, first part that adds meta data, second part that gets convenient segments and third part that is responsible for the run of the campaigns. 
 
 ## Getting Started
 
