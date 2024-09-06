@@ -102,9 +102,10 @@ def run_xtest(request):
 
     return ('Function executed successfully', 200)
 
-def main():
+def main(request):
     query_bigquery_and_process()
-
+    
+    return ('Function executed successfully', 200)
 
 if __name__ == "__main__":
     main()
