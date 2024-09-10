@@ -47,28 +47,32 @@ def start_the_process(bq_client, drive_service, query):
     for row in results:
         code_name = row.code_name
         backend_report = row.backend_report
-        
+        print('-------------------------------------------------\n')
         print(f"Processing row: code_name = {code_name}")
-        
+
         # Check if the code_name has already been processed
         # if code_name not in processed_code_names:
 
         if backend_report != 0:
             try:
                 # Upload backend for this code_name
-                upload_backend.backend_processing(drive_service, bq_client, backend_report, code_name)
+                upload_backend.backend_processing(
+                    drive_service, bq_client, backend_report, code_name
+                )
             except Exception as e:
                 print(f"Error in BER, for codename {code_name}, error is : {e}")
                 continue
-        
+
         # Add the code_name to the set and list
         # processed_code_names.add(code_name)
         unique_code_names.add(code_name)
-        print(f'Monitoring test: ' + unique_code_names)
+
 
     # Iterate over unique code names and call query_orchestrator
     for code_name in unique_code_names:
         query_orchestrator.run_by_codename(code_name, bq_client)
+
+    print(unique_code_names)
 
 
 def run_query(query, bq_client):
@@ -101,10 +105,12 @@ def query_bigquery_and_process():
 
     return "Main Automation Done!"
 
-def main(request):
+
+def main(request=None):
     query_bigquery_and_process()
-    
-    return ('Function executed successfully', 200)
+
+    return ("Function executed successfully", 200)
+
 
 if __name__ == "__main__":
     main()

@@ -31,7 +31,7 @@ dataset_mt_Placelift = "maddictdata.Metadata.Placelift"
 dataset_metadata = "Metadata"
 
 table_HG = "Home_Graph_Cumulative"
-tbl_cmpgn_tracker = "Campaign_Tracker_copy"
+tbl_cmpgn_tracker = "Campaign_Tracker"
 tbl_cmpgn_test = "test"
 table_behavior_lookup = "Lookup_Behavior"
 table_os_mapping = "device_os_mapping"
@@ -51,7 +51,8 @@ schema_back_end = [
     bigquery.SchemaField("campaign", "STRING"),
     bigquery.SchemaField("LINE", "STRING"),
     bigquery.SchemaField("TIMESTAMP", "TIMESTAMP"),
-    bigquery.SchemaField("udid", "STRING"),
+    bigquery.SchemaField("req_id", "STRING"),
+    bigquery.SchemaField("udid_idfa", "STRING"),
     bigquery.SchemaField("devraw", "STRING"),
     bigquery.SchemaField("country", "STRING"),
     bigquery.SchemaField("city", "STRING"),
@@ -86,20 +87,20 @@ table_mapping = {
 }
 
 
-#will transfere to variables later, and change some of the names
+# will transfere to variables later, and change some of the names
 static_query_replace = {
     "{hwg_dataset}": dataset_HWG,
-    "{footfall_dataset}":dataset_footfall,
-    "{project}":project,
-    "{metadata_dataset}":dataset_metadata,
-    "{campaign_tracker_table}":tbl_cmpgn_tracker,
-    "{location_signals_dataset}":dataset_LS,
-    "{device_os_mapping_table}":table_os_mapping,
-    "{hwg_table}":table_HG,
-    "{lookup_behavior_table}":table_behavior_lookup,
-    "{back_end_report_dataset}":dataset_BERs,
-    "{Campaign_segments_dataset}":dataset_campaign_segments,
-    "{tbl_cmpgn_test}":tbl_cmpgn_test
+    "{footfall_dataset}": dataset_footfall,
+    "{project}": project,
+    "{metadata_dataset}": dataset_metadata,
+    "{campaign_tracker_table}": tbl_cmpgn_tracker,
+    "{location_signals_dataset}": dataset_LS,
+    "{device_os_mapping_table}": table_os_mapping,
+    "{hwg_table}": table_HG,
+    "{lookup_behavior_table}": table_behavior_lookup,
+    "{back_end_report_dataset}": dataset_BERs,
+    "{Campaign_segments_dataset}": dataset_campaign_segments,
+    "{tbl_cmpgn_test}": tbl_cmpgn_test,
 }
 
 # Campaign Tracker
@@ -125,14 +126,14 @@ WHERE
     AND DATE_SUB(CURRENT_DATE(), INTERVAL time_interval DAY) >= DATE(last_update) )
   OR ( status = 'Completion Period'
     AND DATE_SUB(CURRENT_DATE(), INTERVAL 9 DAY) >= DATE(end_date) );"""
-  
+
 
 # q_select_by_codename = """SELECT
 #   code_name,
 #   backend_report
 #   FROM
 #   `maddictdata.Metadata.{campaign_tracker_table}`
-#   where 
+#   where
 #   code_name = {codename}
 # """
 

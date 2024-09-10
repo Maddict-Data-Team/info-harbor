@@ -63,10 +63,10 @@ def navigate_and_search_file(
         drive_service, month_folder_id, backend_report
     )
     if not matching_files:
-        print(f"No files starting with '{backend_report}' found in folder '{month_name}'.")
+        # print(f"No files starting with '{backend_report}' found in folder '{month_name}'.")
         return 0, 0, 0
     else:
-        print(f"Files starting with '{backend_report}' found in folder '{month_name}':")
+        # print(f"Files starting with '{backend_report}' found in folder '{month_name}':")
 
         used_folder_id_list = []
         moved_file_ids = []  # List to store IDs of files successfully moved
@@ -237,6 +237,8 @@ def backend_processing(drive_service, bq_client, backend_report, code_name):
             insert_new_BER(curr_id, backend_report, bq_client, code_name)
             print(f"Moving file: {curr_drive_file['name']} to 'Used' folder")
             move_file_to_folder(drive_service, curr_drive_file["id"], used_folder_id)
+
+    return f"Backend report uploaded successfully for {code_name}"
 
 
 def main():
