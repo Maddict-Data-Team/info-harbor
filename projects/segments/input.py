@@ -1,17 +1,18 @@
-code_name = "118" # 122
+code_name = "0000" # 122
 
-campaign_name = "Grand Wagoneer" # Redoxon
+campaign_name = "Rotana" # Redoxon
 
-countries = ["UAE","KSA","QAT","KWT"] # "UAE", "KSA", "QAT"
+countries = ["QAT","KWT","QAT","BHR","OMN"] # ,
 
-segments = ["Young Cosmopolitans","Potential Car Buyers","HNWI"]  # "Potential Car Buyers", "University Attendees", "Car Owners", "Male", "Business Professionals"
+segments = ["Business Professionals","Travel Enthusiasts","Hotels and Resorts Frequenters","custom_Muslims"] 
+# 
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
 dict_custom_segments = { 
-    "custom_Business":{
+    "custom_Muslims":{
         "type":"POI",
-        "General_Category":["Business"],
-        "radius":60
+        "GM_Subcategory":["Mosque","Religious organization","Religious school"],
+        "radius":70
     },
     # "custom_Fine Dining Night Club":{
     #     "type":"POI",
