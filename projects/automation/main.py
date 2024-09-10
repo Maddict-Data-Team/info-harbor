@@ -56,7 +56,7 @@ def start_the_process(bq_client, drive_service, query):
         if backend_report != 0:
             try:
                 # Upload backend for this code_name
-                upload_backend.main(drive_service, bq_client, backend_report, code_name)
+                upload_backend.backend_processing(drive_service, bq_client, backend_report, code_name)
             except Exception as e:
                 print(f"Error in BER, for codename {code_name}, error is : {e}")
                 continue
