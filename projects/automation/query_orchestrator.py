@@ -17,7 +17,7 @@ def run_query(query, bq_client):
     query_job = bq_client.query(query)
 
     query_job.result()
-    print("Query executed successfully")
+    print("Queries executed successfully for:")
 
 
 def run_query_get_res(query, bq_client):
