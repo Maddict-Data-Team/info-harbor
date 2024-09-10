@@ -97,9 +97,11 @@ def query_bigquery_and_process():
     return "Main Automation Done!"
 
 
-def main():
-    query_bigquery_and_process()
 
+def main(request):
+    query_bigquery_and_process()
+    
+    return ('Function executed successfully', 200)
 
 if __name__ == "__main__":
     main()
