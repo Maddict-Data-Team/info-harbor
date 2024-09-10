@@ -238,7 +238,7 @@ def main(drive_service, bq_client, backend_report, code_name):
             curr_drive_file = matching_files[i]
             used_folder_id = used_folder_id_list[i]
             print(f"Inserting: {backend_report} into {code_name} BER table")
-            # insert_new_BER(curr_id, backend_report, bq_client, code_name)
+            insert_new_BER(curr_id, backend_report, bq_client, code_name)
             print(f"Moving file: {curr_drive_file['name']} to 'Used' folder")
             move_file_to_folder(drive_service, curr_drive_file["id"], used_folder_id)
 
