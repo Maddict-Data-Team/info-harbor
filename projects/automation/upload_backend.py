@@ -244,3 +244,4 @@ def main(drive_service, bq_client, backend_report, code_name):
 
 if __name__ == "__main__":
     main()
+    print("Backend report uploaded successfully.")
