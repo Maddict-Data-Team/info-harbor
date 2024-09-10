@@ -31,7 +31,7 @@ dataset_mt_Placelift = "maddictdata.Metadata.Placelift"
 dataset_metadata = "Metadata"
 
 table_HG = "Home_Graph_Cumulative"
-tbl_cmpgn_tracker = "Campaign_Tracker"
+tbl_cmpgn_tracker = "Campaign_Tracker_copy"
 tbl_cmpgn_test = "test"
 table_behavior_lookup = "Lookup_Behavior"
 table_os_mapping = "device_os_mapping"
@@ -51,8 +51,7 @@ schema_back_end = [
     bigquery.SchemaField("campaign", "STRING"),
     bigquery.SchemaField("LINE", "STRING"),
     bigquery.SchemaField("TIMESTAMP", "TIMESTAMP"),
-    bigquery.SchemaField("req_id", "STRING"),
-    bigquery.SchemaField("udid_idfa", "STRING"),
+    bigquery.SchemaField("udid", "STRING"),
     bigquery.SchemaField("devraw", "STRING"),
     bigquery.SchemaField("country", "STRING"),
     bigquery.SchemaField("city", "STRING"),

@@ -64,6 +64,7 @@ def start_the_process(bq_client, drive_service, query):
         # Add the code_name to the set and list
         # processed_code_names.add(code_name)
         unique_code_names.add(code_name)
+        print(f'Monitoring test: ' + unique_code_names)
 
     # Iterate over unique code names and call query_orchestrator
     for code_name in unique_code_names:
