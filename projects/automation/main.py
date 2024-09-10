@@ -96,8 +96,6 @@ def query_bigquery_and_process():
 
     return "Main Automation Done!"
 
-
-
 def main(request):
     query_bigquery_and_process()
     
