@@ -96,8 +96,6 @@ def query_bigquery_and_process():
 
     return "Main Automation Done!"
 
-def run_xtest():
-    print('DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD')
 
 def main():
     query_bigquery_and_process()
