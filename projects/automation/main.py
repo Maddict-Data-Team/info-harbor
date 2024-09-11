@@ -52,16 +52,20 @@ def start_the_process(bq_client, drive_service, query):
 
         # Check if the code_name has already been processed
         # if code_name not in processed_code_names:
-
+        proceed = True
         if backend_report != 0:
             try:
                 # Upload backend for this code_name
-                upload_backend.backend_processing(
+                BER_updated = upload_backend.backend_processing(
                     drive_service, bq_client, backend_report, code_name
                 )
+                if not BER_updated:
+                    proceed = False
             except Exception as e:
                 print(f"Error in BER, for codename {code_name}, error is : {e}")
                 continue
+        if not proceed:
+            continue
 
         # Add the code_name to the set and list
         # processed_code_names.add(code_name)
