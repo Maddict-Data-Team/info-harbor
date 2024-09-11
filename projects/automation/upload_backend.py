@@ -227,6 +227,7 @@ def backend_processing(drive_service, bq_client, backend_report, code_name):
     if get_file_id == 0:
         # today = datetime.now()
         print(f"No Backend reports found for {backend_report} this week")
+        return False
     else:
         print(f"New backend reports are being moved to {backend_report} in BigQuery")
         for i in range(0, len(get_file_id)):
@@ -237,8 +238,9 @@ def backend_processing(drive_service, bq_client, backend_report, code_name):
             insert_new_BER(curr_id, backend_report, bq_client, code_name)
             print(f"Moving file: {curr_drive_file['name']} to 'Used' folder")
             move_file_to_folder(drive_service, curr_drive_file["id"], used_folder_id)
-
-    return f"Backend report uploaded successfully for {code_name}"
+        
+        print(f"Backend report uploaded successfully for {code_name}")
+        return True
 
 
 def main():
