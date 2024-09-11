@@ -117,7 +117,8 @@ WHERE status NOT IN ('Finished', 'On Hold');"""
 
 q_select_active_interval = f"""SELECT
   code_name,
-  backend_report
+  backend_report,
+  status
 FROM
   `maddictdata.Metadata.{tbl_cmpgn_tracker}`
 WHERE
