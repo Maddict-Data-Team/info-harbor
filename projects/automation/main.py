@@ -47,7 +47,7 @@ def start_the_process(bq_client, drive_service, query):
     for row in results:
         code_name = row.code_name
         backend_report = row.backend_report
-        print('-------------------------------------------------\n')
+        print("-------------------------------------------------\n")
         print(f"Processing row: code_name = {code_name}")
 
         # Check if the code_name has already been processed
@@ -71,11 +71,11 @@ def start_the_process(bq_client, drive_service, query):
         # processed_code_names.add(code_name)
         unique_code_names.add(code_name)
 
-
     # Iterate over unique code names and call query_orchestrator
     for code_name in unique_code_names:
         query_orchestrator.run_by_codename(code_name, bq_client)
 
+    print('Codenames that ran during this process: ')
     print(unique_code_names)
 
 
