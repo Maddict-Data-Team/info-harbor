@@ -73,11 +73,11 @@ def start_the_process(bq_client, drive_service, query):
         # processed_code_names.add(code_name)
         unique_code_names.add(code_name)
 
-
     # Iterate over unique code names and call query_orchestrator
     for code_name in unique_code_names:
         query_orchestrator.run_by_codename(code_name, bq_client)
 
+    print('Codenames that ran during this process: ')
     print(unique_code_names)
 
 
