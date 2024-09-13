@@ -45,7 +45,8 @@ dataset_metadata = 'Metadata'
 
 dataset_HWG = "Automated_HWG"
 table_HG = "Home_Graph_Cumulative"
-
+table_WG = "Work_Graph_Cumulative"
+table_hwg_pol_map = "All_Pols_Mapping"
 #BQ Schemas
 
 schema_DID = [bigquery.SchemaField("DID", "STRING")]
@@ -93,8 +94,9 @@ static_query_replace = {
     "{footfall_dataset}":dataset_footfall,
     "{project}":project,
     "{location_signals_dataset}":dataset_LS,
-    "{hwg_table}":table_HG,
-    
+    "{hg_table}":table_HG,
+    "{wg_table}":table_WG,
+    "{pol_map_table}":table_hwg_pol_map
 }
 
 poi_filter_fields = ["General_Category","Category","Subcategory","GM_Subcategory","Chain"]

@@ -167,20 +167,21 @@ def run_query_behavior(segment,bq_client,country,codename=0):
 
     q_filters = ""
     radius = 0
-    if "hg" in segment.lower() or "near by residents" in segment.lower():
-        query = config.get("queries","query_HG")
-        radius = hg_radius
-    elif "hnwi" in segment.lower():
-        query = config.get("queries","query_HNWI")
-    elif "custom" in segment.lower():
+    if "custom" in segment.lower():
         query = config.get("queries","query_POI")
         q_filters,radius = get_custom_query_params(segment)
+    elif "hg" == segment.lower() or "near by residents" in segment.lower():
+        query = config.get("queries","query_HG")
+        radius = hg_radius
+    elif "wg" == segment.lower() or "business professionals" in segment.lower():
+        query = config.get("queries","query_WG")
+    elif "hnwi" in segment.lower():
+        query = config.get("queries","query_HNWI")
     else:
         query = config.get("queries","query_behavior")
 
 
     query = build_query(query,country, codename, radius, segment,q_filters)
-
 
     rows = run_query_get_res(query,bq_client)
     return rows

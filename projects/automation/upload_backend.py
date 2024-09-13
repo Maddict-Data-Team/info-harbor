@@ -24,37 +24,37 @@ def navigate_and_search_file(
     month_abbr = today.strftime("%b")  # Abbreviated month name, e.g., Feb for February
     # day_folder_name = f"{day}{month_abbr}"  # Day folder name, e.g., 7Feb
 
-    print(f"Attempting to navigate to the 'Backend Reports' folder.")
+    # print(f"Attempting to navigate to the 'Backend Reports' folder.")
 
     # Navigate to the year folder
     year_folders = list_folders_inside(drive_service, backend_reports_folder_id, year)
     if not year_folders:
-        print(f"Year folder '{year}' not found.")
-        return 0,0,0
+        # print(f"Year folder '{year}' not found.")
+        return 0, 0, 0
     year_folder_id = year_folders[0]["id"]
-    print(f"Year folder '{year}' found.")
+    # print(f"Year folder '{year}' found.")
 
     # Navigate to the month folder
     # print(f"Looking for month folder '{month_name}'")
     month_folders = list_folders_inside(drive_service, year_folder_id, month_name)
     if not month_folders:
-        print(f"Month folder '{month_name}' not found.")
-        return 0,0,0
+        # print(f"Month folder '{month_name}' not found.")
+        return 0, 0, 0
 
     month_folder_id = month_folders[0]["id"]
-    print(f"Month folder '{month_name}' found.")
+    # print(f"Month folder '{month_name}' found.")
 
     # New code: Check for the "Used" folder within the month folder
     used_folder_id = None
     used_folder_name = "Used"
     used_folders = list_folders_inside(drive_service, month_folder_id, used_folder_name)
     if not used_folders:
-        print(f"'{used_folder_name}' folder not found. Creating it...")
+        # print(f"'{used_folder_name}' folder not found. Creating it...")
         used_folder_id = create_folder_used(
             drive_service, month_folder_id, used_folder_name
         )
     else:
-        print(f"'{used_folder_name}' folder already exists.")
+        # print(f"'{used_folder_name}' folder already exists.")
         used_folder_id = used_folders[0][
             "id"
         ]  # Assuming list_folders_inside returns a similar structure
@@ -63,28 +63,21 @@ def navigate_and_search_file(
         drive_service, month_folder_id, backend_report
     )
     if not matching_files:
-        print(
-            f"No files starting with '{backend_report}' found in folder '{month_name}'."
-        )
-        return 0,0,0
+        # print(f"No files starting with '{backend_report}' found in folder '{month_name}'.")
+        return 0, 0, 0
     else:
-        print(f"Files starting with '{backend_report}' found in folder '{month_name}':")
+        # print(f"Files starting with '{backend_report}' found in folder '{month_name}':")
 
         used_folder_id_list = []
         moved_file_ids = []  # List to store IDs of files successfully moved
         for file in matching_files:
-            moved_file_ids.append(
-                file["id"]
-            ) 
-            used_folder_id_list.append(
-                used_folder_id
-            ) 
-                
-                # Update with the ID of the last file successfully moved
+            moved_file_ids.append(file["id"])
+            used_folder_id_list.append(used_folder_id)
+
+            # Update with the ID of the last file successfully moved
             # return file["id"]
 
-        return moved_file_ids,matching_files,used_folder_id_list
-
+        return moved_file_ids, matching_files, used_folder_id_list
 
 
 def list_folders_inside(service, parent_folder_id, folder_name):
@@ -134,7 +127,6 @@ def create_folder_used(service, parent_folder_id, folder_name):
 
 def insert_new_BER(id, backend_report, bq_client, code_name):
 
-    
     # Construct the new link
     new_link = f"https://drive.google.com/open?id={id}"
     # Define Google Sheets URL
@@ -193,12 +185,12 @@ def delete_table(backend_report, bq_client):
 
 
 # code_name
-def main(drive_service, bq_client, backend_report, code_name):
+def backend_processing(drive_service, bq_client, backend_report, code_name):
 
-    get_file_id,matching_files,used_folder_id_list = navigate_and_search_file(
+    get_file_id, matching_files, used_folder_id_list = navigate_and_search_file(
         drive_service, folder_id_Backend_Reports, backend_report
     )
-    print(get_file_id)
+    # print(get_file_id)
 
     today = datetime.now()
 
@@ -207,7 +199,11 @@ def main(drive_service, bq_client, backend_report, code_name):
         # Get the last day of the previous month by subtracting current day from today
         last_month_date = today - timedelta(days=today.day)
         last_month = last_month_date.strftime("%B")
-        get_file_id_last_month,matching_files_last_month,used_folder_id_list_last_month = navigate_and_search_file(
+        (
+            get_file_id_last_month,
+            matching_files_last_month,
+            used_folder_id_list_last_month,
+        ) = navigate_and_search_file(
             drive_service, folder_id_Backend_Reports, backend_report, last_month
         )
 
@@ -231,16 +227,26 @@ def main(drive_service, bq_client, backend_report, code_name):
     if get_file_id == 0:
         # today = datetime.now()
         print(f"No Backend reports found for {backend_report} this week")
+        return False
     else:
         print(f"New backend reports are being moved to {backend_report} in BigQuery")
-        for i in range(0,len(get_file_id)):
+        for i in range(0, len(get_file_id)):
             curr_id = get_file_id[i]
             curr_drive_file = matching_files[i]
             used_folder_id = used_folder_id_list[i]
             print(f"Inserting: {backend_report} into {code_name} BER table")
-            # insert_new_BER(curr_id, backend_report, bq_client, code_name)
+            insert_new_BER(curr_id, backend_report, bq_client, code_name)
             print(f"Moving file: {curr_drive_file['name']} to 'Used' folder")
             move_file_to_folder(drive_service, curr_drive_file["id"], used_folder_id)
 
+        print(f"Backend report uploaded successfully for {code_name}")
+        return True
+
+
+def main():
+    backend_processing()
+
+
 if __name__ == "__main__":
     main()
+    print("Backend report uploaded successfully.")
