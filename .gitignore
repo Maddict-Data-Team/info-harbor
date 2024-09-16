@@ -17,6 +17,7 @@
 *.swp
 *.DS_Store
 Thumbs.db
+get-pip.py
 
 # Ignore build artifacts and output
 /bin
