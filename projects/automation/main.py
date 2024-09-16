@@ -78,7 +78,11 @@ def start_the_process(bq_client, drive_service, query):
         query_orchestrator.run_by_codename(code_name, bq_client)
 
     print('Codenames that ran during this process: ')
-    print(unique_code_names)
+    if not unique_code_names:
+        print('None')
+    else:
+        print(unique_code_names)
+
 
 
 def run_query(query, bq_client):
