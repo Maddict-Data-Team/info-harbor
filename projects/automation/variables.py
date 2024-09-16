@@ -44,6 +44,8 @@ stage_1 = "Validation"
 stage_2 = "Active"
 stage_3 = "Completion Period"
 stage_4 = "Finished"
+stage_5 = "Error"
+stage_6 = "On Hold"
 
 # BQ Schemas
 
