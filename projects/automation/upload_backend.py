@@ -222,11 +222,11 @@ def backend_processing(drive_service, bq_client, backend_report, code_name):
     if get_file_id:
         print(f"Moved files: {get_file_id}")
     else:
-        print("No files were moved to 'Used'.")
+        print("No files were moved to 'Used' folder")
 
     if get_file_id == 0:
         # today = datetime.now()
-        print(f"No Backend reports found for {backend_report} this week")
+        print(f"No Backend reports for {backend_report} were found this week")
         return False
     else:
         print(f"New backend reports are being moved to {backend_report} in BigQuery")
