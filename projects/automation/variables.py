@@ -118,6 +118,8 @@ END
 WHERE status NOT IN ('Finished', 'On Hold');"""
 
 q_select_active_interval = f"""SELECT
+  id,
+  campaign_name,
   code_name,
   backend_report,
   status
