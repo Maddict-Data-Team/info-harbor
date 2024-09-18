@@ -287,15 +287,10 @@ def run_pipeline_queries(
     queries = config.get(pipeline_type, "queries").split(",")
     # Loop over the list of query names
 
-    # Initialize lists to keep track of executed and skipped queries
-    executed_queries = []
-    skipped_queries = []
-
-    #TESTING
-
     for query_name in queries:
-        # If the query name is "common_queries", run the common queries and skip the rest of the steps for this iteration
+        # If the quey name is common_queries then run the common queries specified in the config file
         if query_name == "common_queries":
+            # Re-call the function with "Common ueries" as the pipeline type
             run_pipeline_queries(
                 config,
                 codename,
@@ -306,18 +301,13 @@ def run_pipeline_queries(
                 bq_client,
                 radiuses,
             )
-            skipped_queries.append(query_name)
+            # skip the rest of the steps for this iteration
             continue
 
+        print("Parsing Query: ", query_name)
         # Get the raw query for the given query name
         query_raw = config.get(pipeline_type, query_name)
-        
-        # Check if the query exists in the config
-        if not query_raw:
-            skipped_queries.append(query_name)
-            continue
-        
-        # Build the query from the raw query
+        # Build the query from the raw
         parsed_query = build_query(
             query_raw,
             codename,
@@ -328,30 +318,20 @@ def run_pipeline_queries(
             start_date_before,
             end_date_before,
         )
-        
-        # Set the destination table using the codename and query name
+        # Set the destiation table using the codename and query name
         destination = f"{project}.{dataset_footfall}.{codename}_{query_name}"
 
-        # Determine the write disposition based on the query name
+        print("Running Query: ", query_name)
+
+        # In all queries except visitors the table should be entirely replaced
         in_write_disposition = "WRITE_TRUNCATE"
         if query_name == "visitors":
             in_write_disposition = "WRITE_APPEND"
 
         # Run the query and save the result in the destination table
         run_query_save_table(parsed_query, destination, bq_client, in_write_disposition)
-
-        # Add the query to the executed list
-        executed_queries.append(query_name)
-
-    # Create a summary of executed and skipped queries
-    query_summary = {
-        "Executed Queries": executed_queries,
-        "Skipped Queries": skipped_queries
-    }
-
-    # Output or log the query summary
-    print(query_summary)
-
+        print("Finished Query: ", query_name)
+        print("\n-------------------------------------------------\n")
 
 
 def get_run_dates(end_date, last_update, start_date, interval):
