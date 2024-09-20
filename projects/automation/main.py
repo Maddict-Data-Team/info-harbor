@@ -51,10 +51,8 @@ def start_the_process(bq_client, drive_service, query):
         backend_report = row.backend_report
         status = row.status
         print('-------------------------------------------------\n')
-        print(f"Processing info:\n"
-              f"code_name={code_name}\n"
-              f"campaign_name={campaign_name}\n"
-              f"id={id}\n")
+        print(f"Processing info: code_name={code_name}, campaign_name={campaign_name}, id={id}")
+
         
         # Check if the code_name has already been processed
         # if code_name not in processed_code_names:
