@@ -129,8 +129,7 @@ WHERE
   ( status = 'Active'
     AND time_interval > 0
     AND DATE_SUB(CURRENT_DATE(), INTERVAL time_interval DAY) >= DATE(last_update) )
-  OR ( status = 'Completion Period'
-    AND DATE_SUB(CURRENT_DATE(), INTERVAL 9 DAY) >= DATE(end_date) );"""
+  OR status = 'Completion Period';"""
 
 
 # q_select_by_codename = """SELECT
