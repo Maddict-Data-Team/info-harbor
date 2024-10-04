@@ -55,7 +55,7 @@ def start_the_process(bq_client, drive_service, code_name):
 
         if backend_report != 0:
             # Upload backend for this code_name
-            upload_backend.main(drive_service, bq_client, backend_report, code_name)
+            upload_backend.backend_processing(drive_service, bq_client, backend_report, code_name)
         
         # Add the code_name to the set and list
         # processed_code_names.add(code_name)

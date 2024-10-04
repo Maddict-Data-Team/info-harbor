@@ -51,10 +51,8 @@ def start_the_process(bq_client, drive_service, query):
         backend_report = row.backend_report
         status = row.status
         print('-------------------------------------------------\n')
-        print(f"Processing info:\n"
-              f"code_name={code_name}\n"
-              f"campaign_name={campaign_name}\n"
-              f"id={id}\n")
+        print(f"Processing info: code_name={code_name}, campaign_name={campaign_name}, id={id}")
+
         
         # Check if the code_name has already been processed
         # if code_name not in processed_code_names:
@@ -73,6 +71,17 @@ def start_the_process(bq_client, drive_service, query):
         if not proceed:
             print(f"Skipped {code_name} because it's BER was not updated")
             continue
+        
+        # Finishes if status is at stage_3
+        if status == stage_3:
+            print(f"Updating for {code_name} because it's status is {status}")
+            # Update the status to "Finished" in BigQuery
+            update_query = f"""
+                UPDATE `maddictdata.Metadata.{tbl_cmpgn_tracker}`
+                SET status = 'Finished'
+                WHERE id = {id};
+            """
+            run_query(update_query, bq_client)
 
         # Add the code_name to the set and list
         # processed_code_names.add(code_name)

@@ -1,0 +1,4 @@
+Starting queries for 123:
+Starting queries for 123:
+{'Executed Queries': ['home_graph', 'travel_distance', 'travel_distance_km', 'dwell_time', 'loyalist_vs_onetime', 'device_os', 'employee_vs_visitor', 'behavior', 'socioeco'], 'Skipped Queries': []}
+{'Executed Queries': ['visitors', 'visitors_before', 'footfall'], 'Skipped Queries': ['common_queries']}
