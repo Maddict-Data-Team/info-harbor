@@ -1,15 +1,15 @@
-campaign_name = "Timberland" # MyNameIsJeff
+campaign_name = "Galleria" # MyNameIsJeff
 
 countries = ["UAE"] # "UAE" ,"KSA"
 
-start_date = "2024-08-13" # "2024-06-10"
+start_date = "2024-09-30" # "2024-06-10"
 
-end_date = "2024-09-15" # "2024-06-30"
+end_date = "2024-11-14" # "2024-06-30"
 
-type = "Placelift Dashboard" # Dashboard or Placelift
+type = "Placelift" # Dashboard or Placelift
 
-backend_reports = [0]
+backend_reports = [57335]
 
 time_interval = 7
 
-has_segments = 0
+has_segments = 1

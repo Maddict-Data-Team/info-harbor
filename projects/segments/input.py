@@ -2,16 +2,16 @@ code_name = "0000" # 122
 
 campaign_name = "Rotana" # Redoxon
 
-countries = ["QAT","KWT","QAT","BHR","OMN"] # ,
+countries = ["QAT","KWT","OMN"] # ,
 
-segments = ["Business Professionals","Travel Enthusiasts","Hotels and Resorts Frequenters","custom_Muslims"] 
+segments = ["custom_Business"] 
 # 
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
 dict_custom_segments = { 
-    "custom_Muslims":{
+    "custom_Business":{
         "type":"POI",
-        "GM_Subcategory":["Mosque","Religious organization","Religious school"],
+        "General_Category":["Business"],
         "radius":70
     },
     # "custom_Fine Dining Night Club":{
