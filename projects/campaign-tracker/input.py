@@ -1,4 +1,4 @@
-campaign_name = "Timberland" # MyNameIsJeff
+campaign_name = "test" # MyNameIsJeff
 
 countries = ["UAE"] # "UAE" ,"KSA"
 
@@ -8,7 +8,7 @@ end_date = "2024-09-15" # "2024-06-30"
 
 type = "Placelift Dashboard" # Dashboard or Placelift
 
-backend_reports = [0]
+backend_reports = [22334]
 
 time_interval = 7
 

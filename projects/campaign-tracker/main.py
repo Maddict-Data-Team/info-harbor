@@ -54,7 +54,7 @@ def metadata_placelift():
                         SELECT
                         COALESCE(MAX(id), 0) + 1,
                         {new_code_name},
-                        '{campaign_name}',
+                        '{campaign_name}-{countries[index]}-{backend_report}',
                         DATE '{start_date}',
                         DATE '{end_date}',
                         '{country}',
