@@ -5,6 +5,8 @@ from google.oauth2.credentials import Credentials
 from datetime import datetime, timedelta
 from google.cloud import secretmanager
 import json
+from google.api_core.exceptions import Conflict
+
 
 from variables import *
 
@@ -126,7 +128,6 @@ def create_folder_used(service, parent_folder_id, folder_name):
 
 
 def insert_new_BER(id, backend_report, bq_client, code_name):
-
     # Construct the new link
     new_link = f"https://drive.google.com/open?id={id}"
     # Define Google Sheets URL
@@ -139,16 +140,23 @@ def insert_new_BER(id, backend_report, bq_client, code_name):
     schema = schema_back_end
     # Define Table Reference
     table_ref = bq_client.dataset(dataset_BERs).table(f"{backend_report}_new")
-    # Create an empty table first
+    # Create an empty table with the schema and external config
     table = bigquery.Table(table_ref, schema=schema)
-    # Set the external data configuration
     table.external_data_configuration = external_config
-    # Create the table
-    table = bq_client.create_table(table)
-    print(f"External table {table.table_id} created successfully.")
+
+    try:
+        # Attempt to create the table
+        table = bq_client.create_table(table)
+        print(f"External table {table.table_id} created successfully.")
+    except Conflict:
+        # If the table already exists, continue without raising an error
+        print(f"Table {backend_report}_new already exists. Continuing process...")
+
+    # Call the other functions to proceed with the rest of the process
     insert_to_main_BER(backend_report, bq_client, code_name)
     delete_table(backend_report, bq_client)
     remove_dups(bq_client, code_name)
+
 
 
 # Function to run a query
