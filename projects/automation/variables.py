@@ -61,6 +61,7 @@ schema_back_end = [
     bigquery.SchemaField("latitude", "FLOAT64"),
     bigquery.SchemaField("longitude", "FLOAT64"),
     bigquery.SchemaField("dev_os", "STRING"),
+    bigquery.SchemaField("dev_language", "STRING"),
     bigquery.SchemaField("dev_make", "STRING"),
     bigquery.SchemaField("dev_type", "STRING"),
     bigquery.SchemaField("connection_type", "STRING"),
