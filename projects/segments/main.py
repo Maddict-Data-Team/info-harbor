@@ -34,6 +34,7 @@ def main():
     # run_push_to_bq(segment_dict, bq_client)
     # create_BER_Table(code_name,bq_client)
     
+    
 
 
     

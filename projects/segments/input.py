@@ -1,18 +1,18 @@
-code_name = "0000" # 122
+code_name = "1" # 122
 
-campaign_name = "Rotana" # Redoxon
+campaign_name = "Abu Dhabi Boat show" # Redoxon
 
-countries = ["QAT","KWT","OMN"] # ,
+countries = ["UAE"] # ,
 
-segments = ["custom_Business"] 
+segments = ["HNWI","Business Professionals","Luxurious Lifestyle"] 
 # 
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
 dict_custom_segments = { 
-    "custom_Business":{
+    "custom_Foodies":{
         "type":"POI",
-        "General_Category":["Business"],
-        "radius":70
+        "General_Category":["Food"],
+        "radius":80
     },
     # "custom_Fine Dining Night Club":{
     #     "type":"POI",
@@ -25,5 +25,5 @@ dict_custom_segments = {
 
 excluded_segments = [] #  "Male"
 
-controlled_size = 2000
+controlled_size = 10000
 hg_radius = 3000
