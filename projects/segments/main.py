@@ -28,11 +28,11 @@ def main():
     bq_client, drive_service = authenticate_get_clients()
     reset_folders()
     get_raw_segments (countries, segments, bq_client)
-    move_without_splitting()
-    # split_files()
+    # move_without_splitting()
+    split_files()
     segment_dict = transfer_files_to_drive()
-    # run_push_to_bq(segment_dict, bq_client)
-    # create_BER_Table(code_name,bq_client)
+    run_push_to_bq(segment_dict, bq_client)
+    create_BER_Table(code_name,bq_client)
     
     
 
