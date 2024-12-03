@@ -1,17 +1,37 @@
-code_name = "1" # 122
+code_name = "Pizza Hut Blunting Dec 2024" # 122
 
-campaign_name = "Abu Dhabi Boat show" # Redoxon
+campaign_name = "OCA_OMD_OSN_" # Redoxon
 
-countries = ["UAE"] # ,
+countries = ["UAE"]#,"","","",""] # ,
 
-segments = ["HNWI","Business Professionals","Luxurious Lifestyle"] 
-# 
+segments = ["Fast Food Lovers"]
+# "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
+# KSA 
+# # z
+
+# KSA 
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
 dict_custom_segments = { 
+    "Custom_QSR Frequenters":{
+        "type":"POI",
+        "Category":["QSR"],
+        "radius":50
+    },
     "custom_Foodies":{
         "type":"POI",
         "General_Category":["Food"],
+        "radius":50
+    },
+        "custom_Competitor Car Owners":{
+        "type":"POI",
+        "General_Category":["Automotive"],
+        "Chain":["Nissan","Ford","Tesla","Jeep"],
+        "radius":160
+    },
+    "custom_Business":{
+        "type":"POI",
+        "General_Category":["Business"],
         "radius":80
     },
     # "custom_Fine Dining Night Club":{

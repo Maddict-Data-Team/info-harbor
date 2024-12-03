@@ -34,7 +34,7 @@ def get_raw_segments(countries, segments, bq_client):
 
                 # print(f"Query for {segment}-{country} added to BigQuery dataset {dataset_campaign_segments}")
                 now = datetime.datetime.now().strftime("%Y%m%d")
-                segment_name = segment.replace(" ", "_")
+                segment_name = segment.replace(" ", "_").replace("/","-")
                 
                 row_count = 0
                 with tqdm(desc=f"Downloading DIDs for {segment} - {country}", unit=" DID", leave=False) as pbar:

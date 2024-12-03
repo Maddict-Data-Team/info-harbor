@@ -1,15 +1,15 @@
-campaign_name = "GMC" # MyNameIsJeff
+campaign_name = "Infiniti 2024 Q4" # MyNameIsJeff
 
-countries = ["UAE"] # "UAE" ,"KSA"
+countries = ["UAE","KWT"] # "UAE" ,"KSA"
 
-start_date = "2024-09-01" # "2024-06-10"
+start_date = "2024-11-01" # "2024-06-10"
 
-end_date = "2024-10-13" # "2024-06-30"
+end_date = "2024-11-30" # "2024-06-30"
 
-type = "Placelift" # Dashboard or Placelift
+type = "Retail" # Dashboard or Placelift
 
-backend_reports = [0]
+backend_reports = [0,0]
 
-time_interval = 42
+time_interval = 50
 
-has_segments = 1
+has_segments = 0
