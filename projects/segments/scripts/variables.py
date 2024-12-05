@@ -25,15 +25,15 @@ key_google_sheets = "keys/maddictdata-google-sheets.json"
 
 # Folders
 
-MAIN_DRIVE_FOLDER_ID = '1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf'
+MAIN_DRIVE_FOLDER_ID = "1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf"
 
 drive_link_folder_Adops = (
     "https://drive.google.com/drive/folders/1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf"
 )
-#https://drive.google.com/drive/u/0/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM https://drive.google.com/drive/u/0/folders/1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf
+# https://drive.google.com/drive/u/0/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM https://drive.google.com/drive/u/0/folders/1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf
 # Table
 
-table_placelift = 'Placelift'
+table_placelift = "Placelift"
 
 # BQ Datasets
 
@@ -41,13 +41,13 @@ dataset_LS = "Location_Signals"
 dataset_footfall = "Back_End_Footfall"
 dataset_BERs = "Back_End_Reports"
 dataset_campaign_segments = "Placelift_Campaign_Segments"
-dataset_metadata = 'Metadata'
+dataset_metadata = "Metadata"
 
 dataset_HWG = "Automated_HWG"
 table_HG = "Home_Graph_Cumulative"
 table_WG = "Work_Graph_Cumulative"
 table_hwg_pol_map = "All_Pols_Mapping"
-#BQ Schemas
+# BQ Schemas
 
 schema_DID = [bigquery.SchemaField("DID", "STRING")]
 
@@ -63,6 +63,7 @@ schema_back_end = [
     bigquery.SchemaField("latitude", "FLOAT64"),
     bigquery.SchemaField("longitude", "FLOAT64"),
     bigquery.SchemaField("dev_os", "STRING"),
+    bigquery.SchemaField("dev_language", "STRING"),
     bigquery.SchemaField("dev_make", "STRING"),
     bigquery.SchemaField("dev_type", "STRING"),
     bigquery.SchemaField("connection_type", "STRING"),
@@ -84,22 +85,27 @@ schema_Combined = [
     bigquery.SchemaField("DID", "STRING"),
     bigquery.SchemaField("Segment", "STRING"),
     bigquery.SchemaField("Country", "STRING"),
-    bigquery.SchemaField("Controlled", "BOOLEAN")
+    bigquery.SchemaField("Controlled", "BOOLEAN"),
 ]
-
 
 
 static_query_replace = {
     "{hwg_dataset}": dataset_HWG,
-    "{footfall_dataset}":dataset_footfall,
-    "{project}":project,
-    "{location_signals_dataset}":dataset_LS,
-    "{hg_table}":table_HG,
-    "{wg_table}":table_WG,
-    "{pol_map_table}":table_hwg_pol_map
+    "{footfall_dataset}": dataset_footfall,
+    "{project}": project,
+    "{location_signals_dataset}": dataset_LS,
+    "{hg_table}": table_HG,
+    "{wg_table}": table_WG,
+    "{pol_map_table}": table_hwg_pol_map,
 }
 
-poi_filter_fields = ["General_Category","Category","Subcategory","GM_Subcategory","Chain"]
+poi_filter_fields = [
+    "General_Category",
+    "Category",
+    "Subcategory",
+    "GM_Subcategory",
+    "Chain",
+]
 
 
 secret_ber = f"projects/maddictdata/secrets/token-ber/versions/latest"

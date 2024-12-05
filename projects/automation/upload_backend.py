@@ -220,9 +220,11 @@ def backend_processing(drive_service, bq_client, backend_report, code_name):
                 pass
             else:
                 get_file_id = get_file_id_last_month
+                matching_files = matching_files_last_month
+                used_folder_id_list = used_folder_id_list_last_month
 
         elif get_file_id_last_month != 0:
-
+            print('reached')
             get_file_id.extend(get_file_id_last_month)
             matching_files.extend(matching_files_last_month)
             used_folder_id_list.extend(used_folder_id_list_last_month)
