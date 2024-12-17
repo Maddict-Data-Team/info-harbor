@@ -1,10 +1,10 @@
-code_name = "134" # 122
+code_name = "135" # 122
 
-campaign_name = "OCA_OMD_OSN_" # Redoxon
+campaign_name = "IHG" # Redoxon
 
-countries = ["UAE"]#,"","","",""] # ,
+countries = ["KSA"]#,"","","",""] # ,
 
-segments = ["Fast Food Lovers"]
+segments = ["Restaurants Frequenters", "Travel Enthusiasts", "Hotels and Resorts Frequenters"]
 # "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
 # KSA 
 # # z
@@ -46,4 +46,5 @@ dict_custom_segments = {
 excluded_segments = [] #  "Male"
 
 controlled_size = 10000
+
 hg_radius = 3000

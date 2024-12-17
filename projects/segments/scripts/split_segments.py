@@ -10,15 +10,16 @@ import shutil
 script_dir = os.path.dirname(__file__)
 
 # Get the parent directory of 'scripts'
-project_root = os.path.abspath(os.path.join(script_dir, '..'))
+project_root = os.path.abspath(os.path.join(script_dir, ".."))
 
 # Add the parent directory to sys.path
 sys.path.append(project_root)
 
 from input import *
 
+
 def read_data_folder(country):
-    
+
     # This function reads the files in the data/raw directory and saves them into three results:
     # 1. list of the sets of data
     # 2. list of names for the segments
@@ -28,11 +29,10 @@ def read_data_folder(country):
     # Folder with data source data/raw
     # input needed: excluded segments
 
-
     # initialize results lists
     sets = []
     names = []
-    
+
     # initalize result sets
     for_controlled = set([])
     exclude = set([])
@@ -40,31 +40,32 @@ def read_data_folder(country):
     # iterate over the files in the "raw" directory
     for file in os.listdir("projects/segments/data/raw"):
         # skip files not from the intended country
-        if country not in file: continue
-        #open the file
+        if country not in file:
+            continue
+        # open the file
         with open("projects/segments/data/raw/" + file) as inpf:
-            #skip the title in the first line
+            # skip the title in the first line
             inpf.readline()
-            #strip any spaces or new lines and save the DID in a set
+            # strip any spaces or new lines and save the DID in a set
             temp_set = set([line.strip() for line in inpf])
-            #append to the list of sets
+            # append to the list of sets
             sets.append(temp_set)
-            #get the segment name from the file name
+            # get the segment name from the file name
             name = file.split(".")[0]
             # append the name to a list
             names.append(name)
-            #boolean for list exclusion
+            # boolean for list exclusion
             is_excluded = False
-            #iterate over the names of lists to be excluded
+            # iterate over the names of lists to be excluded
             for segment in excluded_segments:
-                #if the name is in the exclusion list append the data to the exclusion set 
+                # if the name is in the exclusion list append the data to the exclusion set
                 # and set the exclusion boolean to true
                 if "custom" in segment:
-                    segment = segment.replace("custom_","")
-                if segment.replace(" ","_") in name:
-                    print("Segment ",segment," added to the exclusion set")
+                    segment = segment.replace("custom_", "")
+                if segment.replace(" ", "_") in name:
+                    print("Segment ", segment, " added to the exclusion set")
                     exclude.update(temp_set)
-                    is_excluded=True
+                    is_excluded = True
             # if the data is not to be excluded append it to the set of dids to be used in the control segment
             if not is_excluded:
                 for_controlled.update(temp_set)
@@ -77,7 +78,7 @@ def read_data_folder(country):
 
 def get_control(for_controlled):
     # this function gets a random sample of a pre-determined size to be used as a control segment
-    # parameter: for_controlled, is a list of dids from the audience segments used, and with the dids 
+    # parameter: for_controlled, is a list of dids from the audience segments used, and with the dids
     # from the excluded segments removed from it
     # input needed: controlled size, which is the size of the controlled segment
 
@@ -88,7 +89,6 @@ def get_control(for_controlled):
 
     # return the result segment
     return controlled_segment
-
 
 
 def exclude_control_from_segments(sets, controlled_segment):
@@ -104,7 +104,7 @@ def exclude_control_from_segments(sets, controlled_segment):
 
 
 def Write_output_to_files(sets, control, names):
-    #this function writes the output sets into files
+    # this function writes the output sets into files
     # output directories:
     #   - data/controlled: for the controlled segment
     #   - data/served for the served segments
@@ -113,15 +113,16 @@ def Write_output_to_files(sets, control, names):
     #   -control: control segment
     #   -names: namesof the semgments on the same order as "sets" list
 
-    #get the name fot the control segment from the first segment (codename_country)
+    # get the name fot the control segment from the first segment (codename_country)
     name_split = names[0].split("_")
-    #open the file
+    # open the file
     with open(
-        f"projects/segments/data/controlled/{name_split[0]}_{name_split[1]}_controlled.csv", "w"
+        f"projects/segments/data/controlled/{name_split[0]}_{name_split[1]}_controlled.csv",
+        "w",
     ) as outf:
         # write the column title
         outf.write("DID\n")
-        #write the lines
+        # write the lines
         for did in control:
             outf.write(did + "\n")
 
@@ -129,14 +130,15 @@ def Write_output_to_files(sets, control, names):
     for i in range(0, len(sets)):
         # get the segment
         served = sets[i]
-        # write into a file using the name on the same index 
-        with open("projects/segments/data/served/" + names[i] + "_served.csv", "w") as outf:
+        # write into a file using the name on the same index
+        with open(
+            "projects/segments/data/served/" + names[i] + "_served.csv", "w"
+        ) as outf:
             # write the column title
             outf.write("DID\n")
             # write the lines
             for did in served:
                 outf.write(did + "\n")
-
 
 
 def split_files():
@@ -148,16 +150,20 @@ def split_files():
         exclude_control_from_segments(
             sets, controlled_segment
         )  # exclude control from the segment
-        Write_output_to_files(sets, controlled_segment, names)  # write segments to files
+        Write_output_to_files(
+            sets, controlled_segment, names
+        )  # write segments to files
+
 
 def move_without_splitting():
     # iterate over the raw files
     for file in os.listdir("projects/segments/data/raw"):
-        
-        #move the files to the served folder so they could be uploaded to drive
+
+        # move the files to the served folder so they could be uploaded to drive
         curr = "projects/segments/data/raw/" + file
         dest = "projects/segments/data/served/" + file
-        shutil.move(curr,dest)
+        shutil.move(curr, dest)
+
 
 if __name__ == "__main__":
     split_files()
