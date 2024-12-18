@@ -1,10 +1,10 @@
-code_name = "OCA_OMD_OSN" # 122
+code_name = "Visa" # 122
 
-campaign_name = "OCA_OMD_OSN" # Redoxon
+campaign_name = "Visa" # Redoxon
 
-countries = ["KWT","UAE","KSA"]#,"","","",""] # ,
+countries = ["KSA","KWT","OMN","QAT"]#,"","","",""] # ,
 
-segments = ["Event Goers","Families","HNWI","Young Cosmopolitans","Cinema Goers"]
+segments = ["Travel Enthusiasts"]
 # "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
 # KSA 
 # # z
