@@ -36,7 +36,7 @@ def metadata_placelift():
             # Get the corresponding backend report for the country
             backend_report = backend_reports[index]
             # Generate the query string
-            query = f"""INSERT INTO
+            query = fquery = f"""INSERT INTO
                         {project}.{dataset_metadata}.{tbl_campaign_tracker} (
                             id,
                             code_name,
@@ -52,7 +52,7 @@ def metadata_placelift():
                             segments
                         )
                         SELECT
-                        COALESCE(MAX(id), 0) + 1,
+                        COALESCE(MAX(id), 0) + 1 + {index},
                         {new_code_name},
                         '{campaign_name}-{countries[index]}-{backend_report}',
                         DATE '{start_date}',
@@ -65,7 +65,7 @@ def metadata_placelift():
                         {time_interval},
                         {has_segments}
                         FROM
-                        `maddictdata.Metadata.Campaign_Tracker`;"""
+                        maddictdata.Metadata.Campaign_Tracker;"""
 
             # Execute the query
             client.query(query)

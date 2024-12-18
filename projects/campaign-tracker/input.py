@@ -1,15 +1,15 @@
-campaign_name = "Infiniti 2024 Q4" # MyNameIsJeff
+campaign_name = "IHG" # MyNameIsJeff
 
-countries = ["UAE","KWT"] # "UAE" ,"KSA"
+countries = ["KSA","KSA","KSA"] # "UAE" ,"KSA"
 
-start_date = "2024-11-01" # "2024-06-10"
+start_date = "2024-07-08" # "2024-06-10"
 
 end_date = "2024-11-30" # "2024-06-30"
 
-type = "Retail" # Dashboard or Placelift
+type = "Placelift" # Dashboard or Placelift
 
-backend_reports = [0,0]
+backend_reports = [54792, 54895, 54896]
 
-time_interval = 50
+time_interval = -1
 
-has_segments = 0
+has_segments = 1
