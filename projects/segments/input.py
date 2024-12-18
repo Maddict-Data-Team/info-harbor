@@ -1,10 +1,10 @@
-code_name = "Pizza Hut Blunting Dec 2024" # 122
+code_name = "OCA_OMD_OSN" # 122
 
-campaign_name = "OCA_OMD_OSN_" # Redoxon
+campaign_name = "OCA_OMD_OSN" # Redoxon
 
-countries = ["UAE"]#,"","","",""] # ,
+countries = ["KWT","UAE","KSA"]#,"","","",""] # ,
 
-segments = ["Fast Food Lovers"]
+segments = ["Event Goers","Families","HNWI","Young Cosmopolitans","Cinema Goers"]
 # "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
 # KSA 
 # # z

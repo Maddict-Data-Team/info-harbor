@@ -44,7 +44,7 @@ def get_raw_segments(countries, segments, bq_client):
                             row_count += 1
                             did = row.DID
                             outf.write(f"{did}\n")
-                            
+                            # print(row_count)
                             if row_count % 50000 == 0:
                                 pbar.update(50000)  # Update tqdm for every 50,000 segments
 

@@ -103,7 +103,7 @@ def exclude_control_from_segments(sets, controlled_segment):
     return sets
 
 
-def Write_output_to_files(sets, control, names):
+def Write_output_to_files(sets, control, names,country):
     #this function writes the output sets into files
     # output directories:
     #   - data/controlled: for the controlled segment
@@ -117,7 +117,7 @@ def Write_output_to_files(sets, control, names):
     name_split = names[0].split("_")
     #open the file
     with open(
-        f"projects/segments/data/controlled/{name_split[0]}_{name_split[1]}_controlled.csv", "w"
+        f"projects/segments/data/controlled/{name_split[0]}_{name_split[1]}_{country}_controlled.csv", "w"
     ) as outf:
         # write the column title
         outf.write("DID\n")
@@ -148,7 +148,7 @@ def split_files():
         exclude_control_from_segments(
             sets, controlled_segment
         )  # exclude control from the segment
-        Write_output_to_files(sets, controlled_segment, names)  # write segments to files
+        Write_output_to_files(sets, controlled_segment, names,country)  # write segments to files
 
 def move_without_splitting():
     # iterate over the raw files
