@@ -195,6 +195,7 @@ def get_metadata(codename, config, bq_client):
             Values:
                 -Retail Intelligence Dashboard: for retail intelligece dashboards
                 -Placelift: for placelift dashboards and reports
+                -OOH: for out of home campaign reports
 
     """
 
