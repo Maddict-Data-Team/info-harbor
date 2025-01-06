@@ -1,10 +1,10 @@
-code_name = "Visa" # 122
+code_name = "Panadol_Pananaturla" # 122
 
-campaign_name = "Visa" # Redoxon
+campaign_name = "Panadol Pananaturla" # Redoxon
 
-countries = ["KSA","KWT","OMN","QAT"]#,"","","",""] # ,
+countries = ["UAE"]#,"","","",""] # ,
 
-segments = ["Travel Enthusiasts"]
+segments = ["Families","Pharmacy Goers","Shopping Mall Goers", "Students", "Young Cosmopolitans"]
 # "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
 # KSA 
 # # z
