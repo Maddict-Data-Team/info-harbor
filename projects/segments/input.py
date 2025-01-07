@@ -1,10 +1,10 @@
-code_name = "MAF" # 122
+code_name = "Panadol_Pananaturla" # 122
 
-campaign_name = "MAF" # Redoxon
+campaign_name = "Panadol Pananaturla" # Redoxon
 
-countries = ["UAE","KSA"]#,"","","",""] # ,
+countries = ["UAE"]#,"","","",""] # ,
 
-segments = ["HNWI"]
+segments = ["Families","Pharmacy Goers","Shopping Mall Goers", "Students", "Young Cosmopolitans"]
 # "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
 # KSA 
 # # z
