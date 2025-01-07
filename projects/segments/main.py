@@ -26,8 +26,8 @@ from create_be_table import create_BER_Table
 def main():
 
     bq_client, drive_service = authenticate_get_clients()
-    # reset_folders()   
-    # get_raw_segments(countries, segments, bq_client)
+    reset_folders()   
+    get_raw_segments(countries, segments, bq_client)
     move_without_splitting()
     # split_files()
     segment_dict = transfer_files_to_drive()

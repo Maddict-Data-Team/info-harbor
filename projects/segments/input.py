@@ -1,10 +1,10 @@
-code_name = "Visa" # 122
+code_name = "MAF" # 122
 
-campaign_name = "Visa" # Redoxon
+campaign_name = "MAF" # Redoxon
 
-countries = ["KSA","KWT","OMN","QAT"]#,"","","",""] # ,
+countries = ["UAE","KSA"]#,"","","",""] # ,
 
-segments = ["Travel Enthusiasts"]
+segments = ["HNWI"]
 # "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
 # KSA 
 # # z
