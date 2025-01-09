@@ -1,10 +1,10 @@
-code_name = "Panadol_Pananaturla" # 122
+code_name = "Leo & Luna" # 122
 
-campaign_name = "Panadol Pananaturla" # Redoxon
+campaign_name = "Leo & Luna" # Redoxon
 
 countries = ["UAE"]#,"","","",""] # ,
 
-segments = ["Families","Pharmacy Goers","Shopping Mall Goers", "Students", "Young Cosmopolitans"]
+segments = ["Families","Shopping Mall Goers", "Gamers and Activities Frequenters"]
 # "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
 # KSA 
 # # z
