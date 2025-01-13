@@ -358,7 +358,10 @@ def get_run_dates(end_date, last_update, start_date, interval):
 
     delta = end_date_q - start_date
 
-    start_date_before = start_date - timedelta(days=delta.days)
+    delta_days = delta.days
+    delta_days = delta_days/2
+
+    start_date_before = start_date - timedelta(days=delta_days)
 
     return (
         start_date_q.strftime("%Y-%m-%d"),
