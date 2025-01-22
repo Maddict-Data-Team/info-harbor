@@ -224,6 +224,8 @@ def get_metadata(codename, config, bq_client):
         pipeline_type == "Placelift Report"
         or pipeline_type == "Placelift Dashboard"
         or pipeline_type == "Placelift"
+        or pipeline_type == "Standard Placelift"
+        or pipeline_type == "Comparative Analysis"
     ):
         if segments == 0:
             pipeline_type = "Placelift No Segments"

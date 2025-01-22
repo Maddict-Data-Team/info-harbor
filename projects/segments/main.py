@@ -34,8 +34,8 @@ def main():
     split_files()
 
     segment_dict = transfer_files_to_drive()
-    # run_push_to_bq(segment_dict, bq_client)
-    # create_BER_Table(code_name,bq_client)
+    run_push_to_bq(segment_dict, bq_client)
+    create_BER_Table(code_name,bq_client)
     
     
 

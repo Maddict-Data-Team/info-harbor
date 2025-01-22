@@ -1,10 +1,10 @@
-code_name = "Leo & Luna" # 122
+code_name = "132" # 122
 
-campaign_name = "Leo & Luna" # Redoxon
+campaign_name = "Infinity" # Redoxon
 
-countries = ["UAE"]#,"","","",""] # ,
+countries = ["UAE","KWT"]#,"","","",""] # ,
 
-segments = ["Families","Shopping Mall Goers", "Gamers and Activities Frequenters"]
+segments = ["Car Owners","HNWI","Business Professionas"]
 # "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
 # KSA 
 # # z
