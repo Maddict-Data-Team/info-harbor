@@ -2,9 +2,9 @@ code_name = "132" # 122
 
 campaign_name = "Infinity" # Redoxon
 
-countries = ["KSA"]#,"","","",""] # ,
+countries = ["KWT"]#,"","","",""] # ,
 
-segments = ["Business Professionals"]
+segments = ["custom_Business"]
 # "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
 # KSA 
 # # z
