@@ -67,7 +67,7 @@ def insert_to_combined(table_name, bq_client):
     (DID,Segment,Country,Controlled)
     (
         Select DID,'{Segment}','{country}',{control}
-        FROM {project}.{dataset_campaign_segments}.{table_name}
+        FROM `{project}.{dataset_campaign_segments}.{table_name}`
     )
     """
 

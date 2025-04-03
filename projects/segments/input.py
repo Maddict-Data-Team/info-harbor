@@ -1,11 +1,11 @@
-code_name = "132" # 122
+code_name = "143" # 122
 
-campaign_name = "Infinity" # Redoxon
+campaign_name = "ADNOC" # Redoxon
 
-countries = ["KWT"]#,"","","",""] # ,
+countries = ["UAE"]#,"","","",""] # ,
 
-segments = ["custom_Business"]
-# "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers", 
+segments = ["Hotels and Resorts Frequenters"]
+# ,"Custom_Foodies"
 # KSA 
 # # z
 
@@ -33,7 +33,7 @@ dict_custom_segments = {
         "type":"POI",
         "General_Category":["Business"],
         "radius":80
-    },
+    },      
     # "custom_Fine Dining Night Club":{
     #     "type":"POI",
     #     "General_Category":["food"],
@@ -45,6 +45,6 @@ dict_custom_segments = {
 
 excluded_segments = [] #  "Male"
 
-controlled_size = 10000
+controlled_size = 50000
 
 hg_radius = 3000
