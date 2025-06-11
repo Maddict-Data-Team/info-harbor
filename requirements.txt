@@ -9,3 +9,4 @@ requests==2.31.0
 httplib2==0.22.0
 pandas==2.1.1
 tqdm==4.65.0
+flask==3.0.0
