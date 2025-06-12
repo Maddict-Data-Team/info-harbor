@@ -16,7 +16,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from shared.utils.compatibility import setup_shared_imports
-from shared.config.campaigns import get_campaign, list_campaigns, add_campaign
+from shared.config.campaigns.database_loader import get_database_campaigns
 from shared.models.campaign import CampaignConfig, CustomSegment
 
 # Setup shared imports
@@ -25,16 +25,32 @@ setup_shared_imports()
 app = Flask(__name__)
 app.secret_key = 'info-harbor-secret-key-2024'
 
+def get_live_campaigns():
+    """Get live campaigns from database"""
+    try:
+        return get_database_campaigns()
+    except Exception as e:
+        print(f"Error loading live campaigns: {e}")
+        # Fallback to cached system if database fails
+        from shared.config.campaigns import list_campaigns as fallback_list, get_campaign as fallback_get
+        fallback_codes = fallback_list()
+        fallback_campaigns = {}
+        for code in fallback_codes:
+            try:
+                fallback_campaigns[code] = fallback_get(code)
+            except Exception as fallback_error:
+                print(f"Error loading fallback campaign {code}: {fallback_error}")
+        return fallback_campaigns
+
 @app.route('/')
 def index():
     """Main dashboard page"""
     try:
-        campaigns = list_campaigns()
+        campaigns = get_live_campaigns()
         campaign_data = []
         
-        for code in campaigns:
+        for code, campaign in campaigns.items():
             try:
-                campaign = get_campaign(code)
                 campaign_data.append({
                     'code': code,
                     'name': campaign.campaign_name,
@@ -42,10 +58,10 @@ def index():
                     'type': campaign.type,
                     'start_date': campaign.start_date,
                     'end_date': campaign.end_date,
-                    'status': 'Active' if campaign.start_date and campaign.end_date else 'Draft'
+                    'status': getattr(campaign, 'status', 'Unknown')
                 })
             except Exception as e:
-                print(f"Error loading campaign {code}: {e}")
+                print(f"Error processing campaign {code}: {e}")
                 
         return render_template('index.html', campaigns=campaign_data)
     except Exception as e:
@@ -56,7 +72,13 @@ def index():
 def campaign_detail(code):
     """Campaign detail page"""
     try:
-        campaign = get_campaign(code)
+        campaigns = get_live_campaigns()
+        
+        if code not in campaigns:
+            flash(f'Campaign {code} not found', 'error')
+            return redirect(url_for('index'))
+            
+        campaign = campaigns[code]
         
         # Validate campaign
         errors = campaign.validate()
@@ -80,9 +102,6 @@ def campaign_detail(code):
         }
         
         return render_template('campaign_detail.html', campaign=campaign_data)
-    except ValueError as e:
-        flash(f'Campaign not found: {str(e)}', 'error')
-        return redirect(url_for('index'))
     except Exception as e:
         flash(f'Error loading campaign: {str(e)}', 'error')
         return redirect(url_for('index'))
@@ -102,12 +121,16 @@ def run_campaign_action(code, action):
             flash(f'Campaign tracker completed for campaign {code}', 'success')
             
         elif action == 'validate':
-            campaign = get_campaign(code)
-            errors = campaign.validate()
-            if errors:
-                flash(f'Campaign {code} has validation errors: {", ".join(errors)}', 'error')
+            campaigns = get_live_campaigns()
+            if code not in campaigns:
+                flash(f'Campaign {code} not found', 'error')
             else:
-                flash(f'Campaign {code} is valid', 'success')
+                campaign = campaigns[code]
+                errors = campaign.validate()
+                if errors:
+                    flash(f'Campaign {code} has validation errors: {", ".join(errors)}', 'error')
+                else:
+                    flash(f'Campaign {code} is valid', 'success')
                 
         else:
             flash(f'Unknown action: {action}', 'error')
@@ -135,12 +158,11 @@ def run_automation():
 def api_campaigns():
     """API endpoint to get all campaigns"""
     try:
-        campaigns = list_campaigns()
+        campaigns = get_live_campaigns()
         campaign_data = []
         
-        for code in campaigns:
+        for code, campaign in campaigns.items():
             try:
-                campaign = get_campaign(code)
                 campaign_data.append({
                     'code': code,
                     'name': campaign.campaign_name,
@@ -149,10 +171,11 @@ def api_campaigns():
                     'start_date': campaign.start_date,
                     'end_date': campaign.end_date,
                     'segments': campaign.segments,
+                    'status': getattr(campaign, 'status', 'Unknown'),
                     'is_valid': len(campaign.validate()) == 0
                 })
             except Exception as e:
-                print(f"Error loading campaign {code}: {e}")
+                print(f"Error processing campaign {code}: {e}")
                 
         return jsonify({'campaigns': campaign_data})
     except Exception as e:
@@ -162,7 +185,12 @@ def api_campaigns():
 def api_campaign_detail(code):
     """API endpoint to get campaign details"""
     try:
-        campaign = get_campaign(code)
+        campaigns = get_live_campaigns()
+        
+        if code not in campaigns:
+            return jsonify({'error': f'Campaign {code} not found'}), 404
+            
+        campaign = campaigns[code]
         errors = campaign.validate()
         
         campaign_data = {
@@ -190,10 +218,24 @@ def api_campaign_detail(code):
         }
         
         return jsonify(campaign_data)
-    except ValueError as e:
-        return jsonify({'error': f'Campaign not found: {str(e)}'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/refresh', methods=['POST'])
+def refresh_campaigns():
+    """Refresh campaigns from database - now returns live data directly"""
+    try:
+        campaigns = get_live_campaigns()
+        return jsonify({
+            'success': True,
+            'message': f'Loaded {len(campaigns)} campaigns from database',
+            'campaign_count': len(campaigns)
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/health')
 def health_check():

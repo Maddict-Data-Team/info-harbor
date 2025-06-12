@@ -42,6 +42,7 @@ class CampaignConfig:
     backend_reports: List[int] = field(default_factory=list)
     time_interval: int = -1
     has_segments: int = 0
+    status: str = "Unknown"
     
     # Metadata
     created_at: Optional[datetime] = None
