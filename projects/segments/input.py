@@ -1,10 +1,10 @@
-code_name = "143" # 122
+code_name = "145" # 122
 
-campaign_name = "ADNOC" # Redoxon
+campaign_name = "BYD" # Redoxon
 
 countries = ["UAE"]#,"","","",""] # ,
 
-segments = ["Hotels and Resorts Frequenters"]
+segments = ["Beauty Enthusiasts/Personal Care "]
 # ,"Custom_Foodies"
 # KSA 
 # # z
