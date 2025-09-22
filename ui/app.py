@@ -68,6 +68,11 @@ def index():
         flash(f'Error loading campaigns: {str(e)}', 'error')
         return render_template('index.html', campaigns=[])
 
+@app.route('/documentation')
+def documentation():
+    """Documentation page"""
+    return render_template('documentation.html')
+
 @app.route('/campaign/<code>')
 def campaign_detail(code):
     """Campaign detail page"""
