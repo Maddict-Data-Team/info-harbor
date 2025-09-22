@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Campaign Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active">{{ campaign.name }}</li>
+                </ol>
+            </nav>
+            
+            <h1 class="display-5 fw-bold mb-2">
+                <i class="bi bi-briefcase me-3 text-primary"></i>
+                {{ campaign.name }}
+            </h1>
+            <p class="lead text-muted">Campaign Code: {{ campaign.code }}</p>
+            
+            {% if campaign.is_valid %}
+                <span class="badge bg-success fs-6">
+                    <i class="bi bi-check-circle me-1"></i>Valid Configuration
+                </span>
+            {% else %}
+                <span class="badge bg-danger fs-6">
+                    <i class="bi bi-exclamation-triangle me-1"></i>Configuration Issues
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if campaign.validation_errors %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-danger">
+                <h5 class="alert-heading">Configuration Issues</h5>
+                <ul class="mb-0">
+                    {% for error in campaign.validation_errors %}
+                    <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Campaign Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-muted">Countries</label>
+                            <div>
+                                {% for country in campaign.countries %}
+                                <span class="badge bg-primary me-1">{{ country }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-muted">Type</label>
+                            <div><span class="badge bg-success">{{ campaign.type }}</span></div>
+                        </div>
+                        
+                        {% if campaign.start_date %}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-muted">Start Date</label>
+                            <div>{{ campaign.start_date }}</div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if campaign.end_date %}
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-muted">End Date</label>
+                            <div>{{ campaign.end_date }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <form method="POST" action="{{ url_for('run_campaign_action', code=campaign.code, action='segments') }}">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-pie-chart me-2"></i>Run Segments
+                            </button>
+                        </form>
+                        
+                        <form method="POST" action="{{ url_for('run_campaign_action', code=campaign.code, action='tracker') }}">
+                            <button type="submit" class="btn btn-warning w-100">
+                                <i class="bi bi-graph-up me-2"></i>Run Tracker
+                            </button>
+                        </form>
+                        
+                        <hr>
+                        
+                        <a href="{{ url_for('index') }}" class="btn btn-outline-secondary w-100">
+                            <i class="bi bi-arrow-left me-2"></i>Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Segments</h5>
+                </div>
+                <div class="card-body">
+                    {% if campaign.segments %}
+                        {% for segment in campaign.segments %}
+                        <span class="badge bg-primary me-1 mb-1">{{ segment }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted mb-0">No segments configured</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Excluded Segments</h5>
+                </div>
+                <div class="card-body">
+                    {% if campaign.excluded_segments %}
+                        {% for segment in campaign.excluded_segments %}
+                        <span class="badge bg-danger me-1 mb-1">{{ segment }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted mb-0">No excluded segments</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Add confirmation for destructive actions
+    document.addEventListener('DOMContentLoaded', function() {
+        const forms = document.querySelectorAll('form[action*="/run/"]');
+        forms.forEach(function(form) {
+            form.addEventListener('submit', function(e) {
+                const action = form.action.split('/').pop();
+                if (action === 'segments' || action === 'tracker') {
+                    const confirmed = confirm(`Are you sure you want to run ${action} for this campaign? This may take several minutes to complete.`);
+                    if (!confirmed) {
+                        e.preventDefault();
+                    }
+                }
+            });
+        });
+    });
+</script>
+{% endblock %} 

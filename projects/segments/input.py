@@ -1,16 +1,18 @@
-code_name = "144"  # 122
+code_name = "158" # 122
 
-campaign_name = "Marvel-Thunderbolts"  # Redoxon
+campaign_name = "ADIO" # Redoxon
 
-countries = ["KSA", "UAE", "KWT"]  # ,"","","",""] # ,
+countries = ["UAE","KSA"]#,"","","",""] # ,
 
 segments = [
-    "Young Cosmopolitans",
-    "Cinema Goers",
-    "Gamers and Activities Frequenters",
-    "Fast Food Lovers",
-]
-# "Gamers and Activities Frequenters","University Attendees","custom_Foodies","Families","Fast Food Lovers",
+    "Beauty Enthusiasts/Personal Care ",
+"Health Enthusiasts",
+"Female",
+"Pharmacy Goers",
+"Supermarket Shoppers"]
+# ,"Custom_Foodies"
+# KSA 
+# # z
 
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
@@ -23,7 +25,11 @@ dict_custom_segments = {
         "Chain": ["Nissan", "Ford", "Tesla", "Jeep"],
         "radius": 160,
     },
-    "custom_Business": {"type": "POI", "General_Category": ["Business"], "radius": 80},
+    "custom_Business":{
+        "type":"POI",
+        "General_Category":["Business"],
+        "radius":80
+    },      
     # "custom_Fine Dining Night Club":{
     #     "type":"POI",
     #     "General_Category":["food"],
@@ -35,6 +41,6 @@ dict_custom_segments = {
 
 excluded_segments = []  #  "Male"
 
-controlled_size = 10000
+controlled_size = 50000
 
 hg_radius = 3000
