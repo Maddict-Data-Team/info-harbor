@@ -4,6 +4,7 @@ from google.oauth2.credentials import Credentials
 from google.oauth2 import service_account
 from google.cloud import secretmanager
 import json
+import argparse
 
 import upload_backend
 import query_orchestrator
@@ -31,9 +32,6 @@ def authenticate_with_bigquery(secret_data_bq_info):
 def create_drive_service(secret_data_token_info):
     creds = Credentials.from_authorized_user_info(secret_data_token_info)
     return build("drive", "v3", credentials=creds)
-
-
-
 
 
 def start_the_process(bq_client, drive_service, code_name):
@@ -93,7 +91,11 @@ def query_bigquery_and_process(code_name):
 
 
 def main():
-    query_bigquery_and_process(158)
+    parser = argparse.ArgumentParser(description='Process a specific code name')
+    parser.add_argument('code_name', type=int, help='The code name to process')
+    args = parser.parse_args()
+    
+    query_bigquery_and_process(args.code_name)
 
 
 if __name__ == "__main__":

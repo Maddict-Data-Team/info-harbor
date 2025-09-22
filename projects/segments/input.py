@@ -14,25 +14,16 @@ segments = [
 # KSA 
 # # z
 
-# KSA 
 
 # "custom_KFC stores","custom_Fine Dining Night Club"
-dict_custom_segments = { 
-    "Custom_QSR Frequenters":{
-        "type":"POI",
-        "Category":["QSR"],
-        "radius":50
-    },
-    "custom_Foodies":{
-        "type":"POI",
-        "General_Category":["Food"],
-        "radius":50
-    },
-        "custom_Competitor Car Owners":{
-        "type":"POI",
-        "General_Category":["Automotive"],
-        "Chain":["Nissan","Ford","Tesla","Jeep"],
-        "radius":160
+dict_custom_segments = {
+    "Custom_QSR Frequenters": {"type": "POI", "Category": ["QSR"], "radius": 50},
+    "custom_Foodies": {"type": "POI", "General_Category": ["Food"], "radius": 50},
+    "custom_Competitor Car Owners": {
+        "type": "POI",
+        "General_Category": ["Automotive"],
+        "Chain": ["Nissan", "Ford", "Tesla", "Jeep"],
+        "radius": 160,
     },
     "custom_Business":{
         "type":"POI",
@@ -48,7 +39,7 @@ dict_custom_segments = {
     # }
 }
 
-excluded_segments = [] #  "Male"
+excluded_segments = []  #  "Male"
 
 controlled_size = 50000
 
