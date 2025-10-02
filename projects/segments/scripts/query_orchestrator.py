@@ -1,8 +1,21 @@
 import configparser
-from variables import *
 import sys
 import os
 from pathlib import Path
+
+# Import variables directly from the local file to avoid conflicts
+import importlib.util
+current_dir = os.path.dirname(os.path.abspath(__file__))
+spec = importlib.util.spec_from_file_location("variables_local", os.path.join(current_dir, "variables.py"))
+variables_local = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(variables_local)
+
+# Import the needed variables from variables.py
+static_query_replace = variables_local.static_query_replace
+poi_filter_fields = variables_local.poi_filter_fields
+
+# These variables are defined in input.py, not variables.py
+# They will be imported when we import from input later
 
 
 # Get the path to the directory containing this script (main.py)

@@ -10,3 +10,5 @@ httplib2==0.22.0
 pandas==2.1.1
 tqdm==4.65.0
 flask==3.0.0
+oauth2client==4.1.3
+pydrive2==1.17.0

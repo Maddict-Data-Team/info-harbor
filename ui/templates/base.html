@@ -222,6 +222,13 @@
                         </a>
                     </li>
                     {% endif %}
+                    {% if request.endpoint != 'campaign_tracker' %}
+                    <li class="nav-item">
+                        <a class="btn btn-outline-light btn-sm" href="{{ url_for('campaign_tracker') }}">
+                            <i class="bi bi-plus-circle me-1"></i>Add Campaign
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <form method="POST" action="{{ url_for('run_automation') }}" class="d-inline">
                             <button type="submit" class="btn btn-outline-light btn-sm">

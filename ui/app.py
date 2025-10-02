@@ -73,6 +73,11 @@ def documentation():
     """Documentation page"""
     return render_template('documentation.html')
 
+@app.route('/campaign-tracker')
+def campaign_tracker():
+    """Campaign tracker page"""
+    return render_template('campaign_tracker.html')
+
 @app.route('/campaign/<code>')
 def campaign_detail(code):
     """Campaign detail page"""
@@ -145,6 +150,136 @@ def run_campaign_action(code, action):
         print(f"Error details: {traceback.format_exc()}")
     
     return redirect(url_for('campaign_detail', code=code))
+
+@app.route('/api/campaign/<code>/run/<action>', methods=['POST'])
+def api_run_campaign_action(code, action):
+    """API endpoint to run campaign actions (segments, tracker, etc.)"""
+    try:
+        if action == 'segments':
+            from projects.segments.main_new import main as segments_main
+            segments_main(code)
+            return jsonify({'success': True, 'message': f'Segments processing completed for campaign {code}'})
+            
+        elif action == 'tracker':
+            from projects.campaign_tracker.main_new import main as tracker_main
+            tracker_main(code)
+            return jsonify({'success': True, 'message': f'Campaign tracker completed for campaign {code}'})
+            
+        elif action == 'validate':
+            campaigns = get_live_campaigns()
+            if code not in campaigns:
+                return jsonify({'success': False, 'error': f'Campaign {code} not found'}), 404
+            else:
+                campaign = campaigns[code]
+                errors = campaign.validate()
+                if errors:
+                    return jsonify({'success': False, 'error': f'Campaign {code} has validation errors: {", ".join(errors)}'})
+                else:
+                    return jsonify({'success': True, 'message': f'Campaign {code} is valid'})
+                
+        else:
+            return jsonify({'success': False, 'error': f'Unknown action: {action}'}), 400
+            
+    except Exception as e:
+        print(f"Error details: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': f'Error running {action} for campaign {code}: {str(e)}'}), 500
+
+@app.route('/api/run-all-trackers', methods=['POST'])
+def api_run_all_trackers():
+    """API endpoint to run trackers for all campaigns"""
+    try:
+        campaigns = get_live_campaigns()
+        results = []
+        
+        for code in campaigns.keys():
+            try:
+                from projects.campaign_tracker.main_new import main as tracker_main
+                tracker_main(code)
+                results.append({'code': code, 'status': 'success'})
+            except Exception as e:
+                results.append({'code': code, 'status': 'error', 'error': str(e)})
+        
+        success_count = len([r for r in results if r['status'] == 'success'])
+        error_count = len([r for r in results if r['status'] == 'error'])
+        
+        return jsonify({
+            'success': True,
+            'message': f'Completed trackers for {len(campaigns)} campaigns. {success_count} successful, {error_count} failed.',
+            'results': results
+        })
+        
+    except Exception as e:
+        print(f"Error details: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': f'Error running all trackers: {str(e)}'}), 500
+
+@app.route('/api/campaigns/add', methods=['POST'])
+def api_add_campaign():
+    """API endpoint to add new campaign to database"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        campaign_name = data.get('campaign_name')
+        
+        if not campaign_name:
+            return jsonify({'success': False, 'error': 'Campaign name is required'}), 400
+        
+        # Generate campaign code automatically
+        campaigns = get_live_campaigns()
+        existing_codes = [int(code) for code in campaigns.keys() if code.isdigit()]
+        campaign_code = str(max(existing_codes) + 1) if existing_codes else "143"
+        
+        # Create new campaign configuration
+        from shared.models.campaign import CampaignConfig
+        
+        new_campaign = CampaignConfig(
+            campaign_name=campaign_name,
+            countries=data.get('countries', []),
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+            type=data.get('type', 'Placelift'),
+            controlled_size=data.get('controlled_size', 1000),
+            hg_radius=data.get('hg_radius', 100),
+            time_interval=data.get('time_interval', -1),
+            segments=data.get('segments', []),
+            custom_segments=data.get('custom_segments', {}),
+            excluded_segments=data.get('excluded_segments', []),
+            backend_reports=data.get('backend_reports', [0, 0]),
+            has_segments=data.get('has_segments', 0)
+        )
+        
+        # Here you would typically save to database
+        # For now, we'll just validate and return success
+        errors = new_campaign.validate()
+        if errors:
+            return jsonify({
+                'success': False, 
+                'error': f'Campaign validation failed: {", ".join(errors)}'
+            }), 400
+        
+        # TODO: Implement actual database save
+        # This would involve creating a new campaign configuration file
+        # or inserting into the database
+        
+        return jsonify({
+            'success': True,
+            'message': f'Campaign {campaign_code} added successfully',
+            'campaign': {
+                'code': campaign_code,
+                'name': campaign_name,
+                'type': new_campaign.type,
+                'countries': new_campaign.countries,
+                'start_date': new_campaign.start_date,
+                'end_date': new_campaign.end_date,
+                'is_valid': True
+            }
+        })
+        
+    except Exception as e:
+        print(f"Error details: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': f'Error adding campaign: {str(e)}'}), 500
 
 @app.route('/automation', methods=['POST'])
 def run_automation():

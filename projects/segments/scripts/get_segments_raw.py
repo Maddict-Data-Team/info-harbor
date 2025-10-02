@@ -6,7 +6,16 @@ import os
 import query_orchestrator
 from tqdm import tqdm  # Import tqdm for the progress bar
 
-from variables import *
+# Import variables directly from the local file to avoid conflicts
+import importlib.util
+current_dir = os.path.dirname(os.path.abspath(__file__))
+spec = importlib.util.spec_from_file_location("variables_local", os.path.join(current_dir, "variables.py"))
+variables_local = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(variables_local)
+
+# Import the needed variables
+table_mapping = variables_local.table_mapping
+dataset_campaign_segments = variables_local.dataset_campaign_segments
 
 # Get the path to the directory containing this script (main.py)
 script_dir = os.path.dirname(__file__)
@@ -38,7 +47,7 @@ def get_raw_segments(countries, segments, bq_client):
                 
                 row_count = 0
                 with tqdm(desc=f"Downloading DIDs for {segment} - {country}", unit=" DID", leave=False) as pbar:
-                    with open(f"projects/segments/data/raw/{code_name}_{country}_{segment_name}_{now}.csv", 'a') as outf:
+                    with open(f"data/raw/{code_name}_{country}_{segment_name}_{now}.csv", 'a') as outf:
                         outf.write("DID\n")
                         for row in rows:
                             row_count += 1

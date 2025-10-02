@@ -1,10 +1,11 @@
-code_name = "145" # 122
+code_name = "Boots" # 122
 
-campaign_name = "BYD" # Redoxon
+campaign_name = "Boots" # Redoxon
 
-countries = ["UAE"]#,"","","",""] # ,
+countries = ["UAE"] #,"","","",""] # ,
 
-segments = ["Beauty Enthusiasts/Personal Care "]
+segments = ["Pharmacy Goers", "Shopping Mall Goers", "Female", "Beauty Enthusiasts/Personal Care ", "Health Enthusiasts"]
+
 # ,"Custom_Foodies"
 # KSA 
 # # z
