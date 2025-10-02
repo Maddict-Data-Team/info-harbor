@@ -6,7 +6,7 @@ start_date = "2025-08-28" # "2024-06-10"
 
 end_date = "2025-09-02" # "2024-06-30"
 
-type = "Placelift" # Dashboard or Placelift
+type = "Placelift Period Segments" # Dashboard or Placelift
 
 backend_reports = []
 
