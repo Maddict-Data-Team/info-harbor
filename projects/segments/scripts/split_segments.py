@@ -30,7 +30,6 @@ def read_data_folder(country):
     # input needed: excluded segments
 
     # initialize results lists
-    sets = []
     names = []
 
     # initalize result sets
@@ -46,10 +45,6 @@ def read_data_folder(country):
         with open("projects/segments/data/raw/" + file) as inpf:
             # skip the title in the first line
             inpf.readline()
-            # strip any spaces or new lines and save the DID in a set
-            temp_set = set([line.strip() for line in inpf])
-            # append to the list of sets
-            sets.append(temp_set)
             # get the segment name from the file name
             name = file.split(".")[0]
             # append the name to a list
@@ -60,20 +55,21 @@ def read_data_folder(country):
             for segment in excluded_segments:
                 # if the name is in the exclusion list append the data to the exclusion set
                 # and set the exclusion boolean to true
-                if "custom" in segment:
-                    segment = segment.replace("custom_", "")
+                segment = segment.replace("custom_", "")
+                segment = segment.replace("_", "")
                 if segment.replace(" ", "_") in name:
-                    print("Segment ", segment, " added to the exclusion set")
-                    exclude.update(temp_set)
                     is_excluded = True
+            if is_excluded:
+                continue
+            # strip any spaces or new lines and save the DID in a set
+            temp_set = set(random.sample([line.strip() for line in inpf],k=100000))
             # if the data is not to be excluded append it to the set of dids to be used in the control segment
-            if not is_excluded:
-                for_controlled.update(temp_set)
+            for_controlled.update(temp_set)
     # remove the excluded dids from the for_controlled set to get the dids that will be used to get the control segment
     for_controlled = list(for_controlled - exclude)
 
     # returrn the data sets, names and the dids to be used to get the control
-    return sets, names, for_controlled
+    return names, for_controlled
 
 
 def get_control(for_controlled):
@@ -91,19 +87,7 @@ def get_control(for_controlled):
     return controlled_segment
 
 
-def exclude_control_from_segments(sets, controlled_segment):
-    # this function iterates over the segment sets and excludes the control segment from them
-    # parameters:
-    #   -control_segment a random sample from the audiences used for the campaign
-    #   -sets: sets of dids from the audiences used in the campaign
-    for i in range(0, len(sets)):
-        # subtract the two sets to get a new set with the control excluded
-        sets[i] = sets[i] - controlled_segment
-
-    return sets
-
-
-def Write_output_to_files(sets, control, names,country):
+def Write_output_to_files(control, names,country):
     #this function writes the output sets into files
     # output directories:
     #   - data/controlled: for the controlled segment
@@ -125,31 +109,39 @@ def Write_output_to_files(sets, control, names,country):
         for did in control:
             outf.write(did + "\n")
 
-    # iterate over the segments sets indexes
-    for i in range(0, len(sets)):
-        # get the segment
-        served = sets[i]
-        # write into a file using the name on the same index
-        with open(
-            "projects/segments/data/served/" + names[i] + "_served.csv", "w"
-        ) as outf:
-            # write the column title
-            outf.write("DID\n")
-            # write the lines
-            for did in served:
-                outf.write(did + "\n")
+    i=0
+    # iterate over the files in the "raw" directory
+    for file in os.listdir("projects/segments/data/raw"):
+        # skip files not from the intended country
+        if country not in file:
+            continue
+        # open the file
+        with open("projects/segments/data/raw/" + file) as inpf:
+            # skip the title in the first line
+            inpf.readline()
 
+
+            with open(
+            "projects/segments/data/served/" + names[i] + "_served.csv", "w"
+            ) as outf:
+                # write the column title
+                outf.write("DID\n")
+                # write the lines
+                for did in inpf:
+                    if did not in control:
+                        outf.write(did.strip() + "\n")
+        i+=1
 
 def split_files():
 
     for country in countries:
         # Thin function runs all the other functions in turn
-        sets, names, for_controlled = read_data_folder(country)  # read data
+        names, for_controlled = read_data_folder(country)  # read data
         controlled_segment = get_control(for_controlled)  # get control segment
-        exclude_control_from_segments(
-            sets, controlled_segment
-        )  # exclude control from the segment
-        Write_output_to_files(sets, controlled_segment, names,country)  # write segments to files
+        # exclude_control_from_segments(
+        #     sets, controlled_segment
+        # )  # exclude control from the segment
+        Write_output_to_files(controlled_segment, names,country)  # write segments to files
 
 def move_without_splitting():
     # iterate over the raw files
