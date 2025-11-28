@@ -9,7 +9,7 @@ SCOPES = [
     'https://www.googleapis.com/auth/drive.file'
 ]
 
-SERVICE_ACCOUNT_FILE = 'maddictdata-8a4562e58328.json'
+SERVICE_ACCOUNT_FILE = 'keys/maddictdata-bq.json'
 
 def create_drive_service():
     try:
