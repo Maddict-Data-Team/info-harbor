@@ -1,15 +1,11 @@
-code_name = "167" # 122
+code_name = "161" # 122
 
-campaign_name = "ALJ" # Redoxon
+campaign_name = "Boots" # Redoxon
 
-countries = ["KSA"]#,"","","",""] # ,
+countries = ["UAE"] #,"","","",""] # ,
 
-segments = [
-"Potential Car Buyers",
-"Car Owners",
-"Families",
-"Young Cosmopolitans"
-]
+segments = ["Female", "Pharmacy Goers", "Shopping Mall Goers", "Beauty Enthusiasts/Personal Care ", "Health Enthusiasts"]
+
 # ,"Custom_Foodies"
 # KSA 
 # # z

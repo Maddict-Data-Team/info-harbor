@@ -1,0 +1,485 @@
+{% extends "base.html" %}
+
+{% block title %}Add New Campaign - Info Harbor{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="h2 mb-2">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        Add New Campaign
+                    </h1>
+                    <p class="text-muted mb-0">Create and add new campaigns to the database</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Input Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-pencil-square me-2"></i>
+                New Campaign Details
+            </h5>
+        </div>
+        <div class="card-body">
+            <form id="campaign-form">
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label for="campaign-name" class="form-label">Campaign Name *</label>
+                        <input type="text" class="form-control" id="campaign-name" placeholder="e.g., Timberland, Nike, etc." required>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="start-date" class="form-label">Start Date</label>
+                        <input type="date" class="form-control" id="start-date" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="end-date" class="form-label">End Date</label>
+                        <input type="date" class="form-control" id="end-date" required>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="campaign-type" class="form-label">Campaign Type</label>
+                        <select class="form-select" id="campaign-type" required>
+                            <option value="Placelift">Placelift</option>
+                            <option value="Comparative Analysis">Comparative Analysis</option>
+                            <option value="OOH">OOH</option>
+                            <option value="Retail Intelligence">Retail Intelligence</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Time Interval</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="number" class="form-control" id="time-interval" value="" min="-1">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="use-default-interval">
+                                <label class="form-check-label" for="use-default-interval">
+                                    None
+                                </label>
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">Check to use default interval (-1), uncheck to specify custom value</small>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Countries</label>
+                        <div class="d-flex gap-2 mb-2">
+                            <select class="form-select" id="country-select">
+                                <option value="">Select a country...</option>
+                                <option value="UAE">UAE</option>
+                                <option value="KSA">KSA</option>
+                                <option value="QAT">QAT</option>
+                                <option value="OMN">OMN</option>
+                                <option value="BHR">BHR</option>
+                                <option value="KWT">KWT</option>
+                            </select>
+                            <button type="button" class="btn btn-outline-primary" id="add-country">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                        </div>
+                        <div id="selected-countries" class="d-flex flex-wrap gap-2">
+                            <!-- Selected countries will appear here as badges -->
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Backend Reports</label>
+                        <div class="d-flex gap-2 mb-2">
+                            <input type="number" class="form-control" id="backend-report-input" placeholder="Enter report ID" min="0" value="0">
+                            <button type="button" class="btn btn-outline-primary" id="add-backend-report">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                        </div>
+                        <div id="selected-backend-reports" class="d-flex flex-wrap gap-2">
+                            <!-- Selected backend reports will appear here as badges -->
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="has-segments" value="1">
+                            <label class="form-check-label" for="has-segments">
+                                Has Segments
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success">
+                                <i class="bi bi-plus-circle me-2"></i>
+                                Add Campaign to Database
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Recent Campaigns -->
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-clock-history me-2"></i>
+                Recently Added Campaigns
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover" id="recent-campaigns-table">
+                    <thead>
+                        <tr>
+                            <th>Campaign Code</th>
+                            <th>Campaign Name</th>
+                            <th>Type</th>
+                            <th>Countries</th>
+                            <th>Date Range</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-campaigns-tbody">
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">
+                                <i class="bi bi-inbox me-2"></i>
+                                No campaigns added yet
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-journal-text me-2"></i>
+                Activity Log
+            </h5>
+        </div>
+        <div class="card-body">
+            <div id="activity-log" class="bg-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">
+                <div class="text-muted">
+                    <i class="bi bi-info-circle me-2"></i>
+                    No activities yet. Add a campaign to see logs here.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Modal -->
+<div class="modal fade" id="loadingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-4">
+                <div class="loading mb-3" style="width: 40px; height: 40px; border-width: 4px;"></div>
+                <h5 id="loading-title">Processing Campaign Tracker</h5>
+                <p id="loading-message" class="text-muted mb-0">Please wait while we process your request...</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let loadingModal;
+let recentCampaigns = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    loadRecentCampaigns();
+    setupDynamicInputs();
+    setupTimeIntervalToggle();
+});
+
+function loadRecentCampaigns() {
+    fetch('/api/campaigns')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            recentCampaigns = data.campaigns.slice(0, 5); // Get last 5 campaigns
+            updateRecentCampaignsTable(recentCampaigns);
+        })
+        .catch(error => {
+            console.error('Error loading recent campaigns:', error);
+            showAlert('Error loading recent campaigns: ' + error.message, 'danger');
+        });
+}
+
+function updateRecentCampaignsTable(campaigns) {
+    const tbody = document.getElementById('recent-campaigns-tbody');
+    
+    if (campaigns.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center text-muted">
+                    <i class="bi bi-inbox me-2"></i>
+                    No campaigns found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = campaigns.map(campaign => `
+        <tr>
+            <td>
+                <span class="badge bg-primary">${campaign.code}</span>
+            </td>
+            <td>${campaign.name}</td>
+            <td>
+                <span class="badge bg-secondary">${campaign.type}</span>
+            </td>
+            <td>
+                <small>${campaign.countries.join(', ')}</small>
+            </td>
+            <td>
+                <small class="text-muted">
+                    ${campaign.start_date} to ${campaign.end_date}
+                </small>
+            </td>
+            <td>
+                <span class="badge ${campaign.is_valid ? 'bg-success' : 'bg-danger'}">
+                    ${campaign.is_valid ? 'Valid' : 'Invalid'}
+                </span>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showLoadingModal(title, message) {
+    document.getElementById('loading-title').textContent = title;
+    document.getElementById('loading-message').textContent = message;
+    loadingModal.show();
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('.container');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const bsAlert = new bootstrap.Alert(alertDiv);
+        bsAlert.close();
+    }, 5000);
+}
+
+function addToLog(message, type) {
+    const logContainer = document.getElementById('activity-log');
+    const timestamp = new Date().toLocaleTimeString();
+    const logEntry = document.createElement('div');
+    logEntry.className = `mb-2 ${type === 'success' ? 'text-success' : 'text-danger'}`;
+    logEntry.innerHTML = `<small>[${timestamp}] ${message}</small>`;
+    
+    logContainer.appendChild(logEntry);
+    logContainer.scrollTop = logContainer.scrollHeight;
+}
+
+function setupDynamicInputs() {
+    // Setup countries
+    document.getElementById('add-country').addEventListener('click', function() {
+        const select = document.getElementById('country-select');
+        const selectedCountry = select.value;
+        
+        if (!selectedCountry) {
+            showAlert('Please select a country first', 'warning');
+            return;
+        }
+        
+        addCountryBadge(selectedCountry);
+        select.value = ''; // Reset selection
+    });
+
+    // Setup backend reports
+    document.getElementById('add-backend-report').addEventListener('click', function() {
+        const input = document.getElementById('backend-report-input');
+        const reportId = input.value.trim();
+        
+        if (!reportId) {
+            showAlert('Please enter a report ID first', 'warning');
+            return;
+        }
+        
+        if (isNaN(reportId) || parseInt(reportId) < 0) {
+            showAlert('Please enter a valid positive number', 'warning');
+            return;
+        }
+        
+        addBackendReportBadge(reportId);
+        input.value = '0'; // Reset to default value
+    });
+
+}
+
+function addCountryBadge(country) {
+    const container = document.getElementById('selected-countries');
+    const existingBadges = container.querySelectorAll('.country-badge');
+    const existingCountries = Array.from(existingBadges).map(badge => badge.dataset.country);
+    
+    if (existingCountries.includes(country)) {
+        showAlert(`Country ${country} is already selected`, 'warning');
+        return;
+    }
+    
+    const badge = document.createElement('span');
+    badge.className = 'badge bg-primary country-badge';
+    badge.dataset.country = country;
+    badge.innerHTML = `
+        ${country}
+        <button type="button" class="btn-close btn-close-white ms-1" onclick="removeCountryBadge('${country}')"></button>
+    `;
+    container.appendChild(badge);
+}
+
+function removeCountryBadge(country) {
+    const badge = document.querySelector(`.country-badge[data-country="${country}"]`);
+    if (badge) {
+        badge.remove();
+    }
+}
+
+function addBackendReportBadge(reportId) {
+    const container = document.getElementById('selected-backend-reports');
+    const existingBadges = container.querySelectorAll('.backend-report-badge');
+    const existingReports = Array.from(existingBadges).map(badge => badge.dataset.reportId);
+    
+    if (existingReports.includes(reportId)) {
+        showAlert(`Report ID ${reportId} is already added`, 'warning');
+        return;
+    }
+    
+    const badge = document.createElement('span');
+    badge.className = 'badge bg-success backend-report-badge';
+    badge.dataset.reportId = reportId;
+    badge.innerHTML = `
+        Report ${reportId}
+        <button type="button" class="btn-close btn-close-white ms-1" onclick="removeBackendReportBadge('${reportId}')"></button>
+    `;
+    container.appendChild(badge);
+}
+
+function removeBackendReportBadge(reportId) {
+    const badge = document.querySelector(`.backend-report-badge[data-report-id="${reportId}"]`);
+    if (badge) {
+        badge.remove();
+    }
+}
+
+function setupTimeIntervalToggle() {
+    const checkbox = document.getElementById('use-default-interval');
+    const input = document.getElementById('time-interval');
+    
+    checkbox.addEventListener('change', function() {
+        if (this.checked) {
+            input.disabled = true;
+            input.value = '-1';
+        } else {
+            input.disabled = false;
+            input.value = '';
+        }
+    });
+}
+
+
+
+// Handle form submission
+document.getElementById('campaign-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = {
+        campaign_name: document.getElementById('campaign-name').value,
+        start_date: document.getElementById('start-date').value,
+        end_date: document.getElementById('end-date').value,
+        type: document.getElementById('campaign-type').value,
+        time_interval: parseInt(document.getElementById('time-interval').value),
+        countries: Array.from(document.querySelectorAll('.country-badge'))
+            .map(badge => badge.dataset.country),
+        backend_reports: Array.from(document.querySelectorAll('.backend-report-badge'))
+            .map(badge => parseInt(badge.dataset.reportId)),
+        has_segments: document.getElementById('has-segments').checked ? 1 : 0
+    };
+    
+    if (!formData.campaign_name) {
+        showAlert('Please enter a campaign name', 'warning');
+        return;
+    }
+    
+    if (!formData.start_date || !formData.end_date) {
+        showAlert('Please select start and end dates', 'warning');
+        return;
+    }
+    
+    if (formData.countries.length === 0) {
+        showAlert('Please select at least one country', 'warning');
+        return;
+    }
+    
+    showLoadingModal(`Adding campaign ${formData.campaign_code} to database`, 'Please wait while we create the new campaign...');
+    
+    fetch('/api/campaigns/add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        loadingModal.hide();
+        if (data.success) {
+            showAlert(`Campaign ${formData.campaign_code} added successfully to database`, 'success');
+            addToLog(`✅ Campaign ${formData.campaign_code} (${formData.campaign_name}) added to database`, 'success');
+            // Reset form
+            document.getElementById('campaign-form').reset();
+            document.getElementById('time-interval').value = '-1';
+            document.getElementById('use-default-interval').checked = true;
+            document.getElementById('time-interval').disabled = true;
+            
+            // Reset dynamic inputs
+            document.getElementById('selected-countries').innerHTML = '';
+            document.getElementById('country-select').value = '';
+            
+            document.getElementById('selected-backend-reports').innerHTML = '';
+            document.getElementById('backend-report-input').value = '0';
+            
+            // Refresh recent campaigns
+            loadRecentCampaigns();
+        } else {
+            throw new Error(data.error || 'Unknown error occurred');
+        }
+    })
+    .catch(error => {
+        loadingModal.hide();
+        console.error('Error adding campaign:', error);
+        showAlert(`Error adding campaign ${formData.campaign_code}: ${error.message}`, 'danger');
+        addToLog(`❌ Failed to add campaign ${formData.campaign_code}: ${error.message}`, 'danger');
+    });
+});
+</script>
+{% endblock %} 

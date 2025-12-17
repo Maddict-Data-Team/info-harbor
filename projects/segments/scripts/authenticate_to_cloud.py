@@ -5,7 +5,22 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.errors import HttpError
 from google.cloud import bigquery
 import json
-from variables import *
+import os
+import sys
+
+# Get the directory containing this script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Import variables directly from the local file to avoid conflicts
+import importlib.util
+spec = importlib.util.spec_from_file_location("variables_local", os.path.join(current_dir, "variables.py"))
+variables_local = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(variables_local)
+secret_ber = variables_local.secret_ber
+secret_bq = variables_local.secret_bq
+project = variables_local.project
 
 
 # Authenticate with BigQuery

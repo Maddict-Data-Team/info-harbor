@@ -6,7 +6,16 @@ import os
 import query_orchestrator
 from tqdm import tqdm  # Import tqdm for the progress bar
 
-from variables import *
+# Import variables directly from the local file to avoid conflicts
+import importlib.util
+current_dir = os.path.dirname(os.path.abspath(__file__))
+spec = importlib.util.spec_from_file_location("variables_local", os.path.join(current_dir, "variables.py"))
+variables_local = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(variables_local)
+
+# Import the needed variables
+table_mapping = variables_local.table_mapping
+dataset_campaign_segments = variables_local.dataset_campaign_segments
 
 # Get the path to the directory containing this script (main.py)
 script_dir = os.path.dirname(__file__)
