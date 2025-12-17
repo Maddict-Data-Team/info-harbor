@@ -1,4 +1,3 @@
-from variables import *
 import datetime
 import sys
 import os
@@ -12,6 +11,9 @@ script_dir = os.path.dirname(__file__)
 project_root = os.path.abspath(os.path.join(script_dir, '..'))
 sys.path.append(project_root)
 
+# Import variables from the scripts directory
+from variables import *
+# Import input from the parent directory
 from input import *
 
 def find_or_create_folder(drive, parent_id, folder_name):
@@ -140,8 +142,7 @@ def transfer_files_to_drive():
     folder_id = create_folder(drive, campaign_name, drive_link_folder_Adops)
 
     if folder_id:
-        # Upload segments to drive
-        uploaded_ids = transfer(drive, folder_id)
+        uploaded_ids = transfer(drive, folder_id)         # Upload segments to drive
         return uploaded_ids
     else:
         print("Failed to create the campaign folder.")

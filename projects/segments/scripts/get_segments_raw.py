@@ -47,7 +47,7 @@ def get_raw_segments(countries, segments, bq_client):
                 
                 row_count = 0
                 with tqdm(desc=f"Downloading DIDs for {segment} - {country}", unit=" DID", leave=False) as pbar:
-                    with open(f"data/raw/{code_name}_{country}_{segment_name}_{now}.csv", 'a') as outf:
+                    with open(f"projects/segments/data/raw/{code_name}_{country}_{segment_name}_{now}.csv", 'a') as outf:
                         outf.write("DID\n")
                         for row in rows:
                             row_count += 1

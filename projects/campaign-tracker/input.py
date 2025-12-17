@@ -1,15 +1,15 @@
-campaign_name = "boots" # MyNameIsJeff
+campaign_name = "BYD Q3" # MyNameIsJeff
 
 countries = ["UAE"] # "UAE" ,"KSA"
 
-start_date = "2025-08-28" # "2024-06-10"
+start_date = "2025-06-30" # "2024-06-10"
 
-end_date = "2025-09-02" # "2024-06-30"
+end_date = "2025-09-30" # "2024-06-30"
 
-type = "Placelift Period Segments" # Dashboard or Placelift
+type = "Retail Intelligence" # Dashboard or Placelift
 
-backend_reports = []
+backend_reports = [0]
 
 time_interval = 7
 
-has_segments = 1
+has_segments = 0
