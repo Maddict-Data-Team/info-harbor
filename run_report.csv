@@ -1,0 +1,14 @@
+file,file_id,status,expected_cols,actual_cols,first_mismatch_index,expected_at_mismatch,actual_at_mismatch,missing,extra,mimeType
+65507_1Nov_3Dec.csv,1MX2j4dLxeFAWkKcwonZ-qNX-TrgX0c0V,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+67300_1Nov_30Nov.csv,1F_Z5BqN646XtI3M2jLaC7MLiyxNdhHfU,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+67300_1Nov_4Dec.csv,1OIN-iZFrWxDSYtSpx3VFi6U9WQOMQqv4,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+67300_Nov_10Dec.csv,13kMSvLHwu5zN49XnjUHswOxk583kzt9e,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+67380_1Nov_3Dec.csv,1GskC1jGRf1fHNDAqSTSQn6zwPqJcwssr,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+67980_19Nov_11Dec.csv,1cckoF8-IWc5dMVcYAOhT5JF5-ipHvPX4,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+67980_19Nov_4Dec.csv,1IIhzphsE9uKgp2O6EtDFuG3xtZpRU6cS,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+67988_19Nov_11Dec.csv,1fAHtDOYsdrOfLsHKMLW3U14IGAKpbhHI,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+67988_19Nov_4Dec.csv,1sD9qp2Sc-lGi1sEz4lz9UAaPbWC1D1tA,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+68070_21Nov_4Dec.csv,1sE7Yi_OnFOvS2vG6iY-HjiY3HTzigNDh,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+68073_21Nov_4Dec.csv,177NR_J6VS8HQogfRsLoT-RBENjs3CSha,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+68252_19Nov_4Dec.csv,1vKb64dgwjgJSq7dKY95aZ4Cayi-5a98G,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
+68278_21Nov_4Dec.csv,19UherBbxM1sz8-ZfFRogZ1MbHhieECFV,MISMATCH,27,28,18,zip,inv_categories,,inv_categories,text/csv
