@@ -39,5 +39,7 @@ schema_poi = [
     bigquery.SchemaField("country_id", "INT64"),
     bigquery.SchemaField("city_id", "INT64"),
     bigquery.SchemaField("radius", "INT64"),  # Default radius, can be adjusted
+    bigquery.SchemaField("chain", "STRING"),
+    bigquery.SchemaField("data_filter", "INT64"),
 ]
 

@@ -135,7 +135,36 @@ def insert_pois(bq_client, pois_data, table_name):
             return False
     else:
         print(f"✅ Table {table_name} already exists. Inserting data...")
-    
+
+    # Determine which optional columns exist in the table schema
+    try:
+        table = bq_client.get_table(f"{project}.{dataset_footfall}.{table_name}")
+        existing_fields = {field.name for field in table.schema}
+    except Exception as e:
+        print(f"⚠️ Warning: Could not fetch table schema, assuming no optional columns. {e}")
+        existing_fields = set()
+
+    has_chain = "chain" in existing_fields
+    has_data_filter = "data_filter" in existing_fields
+
+    # Build the column list based on available fields
+    base_columns = [
+        "POI_ID",
+        "poi_name",
+        "longitude",
+        "latitude",
+        "country",
+        "city",
+        "country_id",
+        "city_id",
+        "radius",
+    ]
+    columns = base_columns[:]
+    if has_chain:
+        columns.append("chain")
+    if has_data_filter:
+        columns.append("data_filter")
+
     # Get the starting POI_ID
     max_poi_id = get_max_poi_id(bq_client, table_name)
     starting_poi_id = max_poi_id + 1
@@ -145,7 +174,8 @@ def insert_pois(bq_client, pois_data, table_name):
     default_radius = 80  # Default radius in meters if not specified in input
     
     for idx, poi in enumerate(pois_data):
-        poi_id = starting_poi_id + idx
+        explicit_poi_id = poi.get("poi_id")
+        poi_id = explicit_poi_id if explicit_poi_id is not None else (starting_poi_id + idx)
         country_id = get_country_id(bq_client, poi["country"])
         city_id = get_city_id(bq_client, poi["city"], poi["country"])
         
@@ -155,19 +185,50 @@ def insert_pois(bq_client, pois_data, table_name):
         # Escape single quotes in name
         name_escaped = poi['name'].replace("'", "''")
         city_escaped = poi['city'].replace("'", "''")
-        
-        values.append(
-            f"({poi_id}, '{name_escaped}', {poi['longitude']}, {poi['latitude']}, "
-            f"'{poi['country']}', '{city_escaped}', "
-            f"{country_id if country_id is not None else 'NULL'}, "
-            f"{city_id if city_id is not None else 'NULL'}, "
-            f"{radius})"
-        )
+        chain_raw = poi.get("chain")
+        chain_escaped = chain_raw.replace("'", "''") if isinstance(chain_raw, str) else None
+
+        # Compute data_filter if requested and column exists (explicit override if provided)
+        if has_data_filter:
+            try:
+                if "data_filter" in poi and poi["data_filter"] is not None:
+                    # Explicit override from input
+                    data_filter_val = int(poi["data_filter"])
+                elif main_chain is None:
+                    data_filter_val = "NULL"
+                else:
+                    poi_chain_norm = (chain_raw or "").strip().lower()
+                    main_chain_norm = str(main_chain).strip().lower()
+                    data_filter_val = 1 if poi_chain_norm and poi_chain_norm == main_chain_norm else 2
+            except NameError:
+                # main_chain not defined in input.py
+                data_filter_val = "NULL"
+        else:
+            data_filter_val = None
+
+        # Build value tuple in the same order as 'columns'
+        row_values = [
+            str(poi_id),
+            f"'{name_escaped}'",
+            str(poi['longitude']),
+            str(poi['latitude']),
+            f"'{poi['country']}'",
+            f"'{city_escaped}'",
+            (str(country_id) if country_id is not None else "NULL"),
+            (str(city_id) if city_id is not None else "NULL"),
+            str(radius),
+        ]
+        if has_chain:
+            row_values.append(f"'{chain_escaped}'" if chain_escaped is not None else "NULL")
+        if has_data_filter:
+            row_values.append(str(data_filter_val) if data_filter_val != "NULL" else "NULL")
+
+        values.append(f"({', '.join(row_values)})")
     
     # Build insert query
     query = f"""
         INSERT INTO `{project}.{dataset_footfall}.{table_name}`
-        (POI_ID, poi_name, longitude, latitude, country, city, country_id, city_id, radius)
+        ({', '.join(columns)})
         VALUES
         {', '.join(values)}
     """
