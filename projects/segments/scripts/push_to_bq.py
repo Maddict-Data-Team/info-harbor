@@ -1,18 +1,27 @@
 # this code is for pushing the audience segment to big query in preparation for the reports
 import sys
 import os
+import importlib.util
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Load variables from same folder (scripts/) so schema_DID etc. are always defined
+_vars_path = os.path.join(script_dir, "variables.py")
+_spec = importlib.util.spec_from_file_location("variables_local", _vars_path)
+_vars = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_vars)
+# Inject all public names from variables into this module
+for _name in dir(_vars):
+    if not _name.startswith("_"):
+        globals()[_name] = getattr(_vars, _name)
 
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
-from variables import *
-from transfer_to_drive import transfer_files_to_drive
-
-# aaa
-script_dir = os.path.dirname(__file__)
 project_root = os.path.abspath(os.path.join(script_dir, ".."))
-sys.path.append(project_root)
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
+from transfer_to_drive import transfer_files_to_drive
 from input import *
 
 # # Authenticate with BigQuery
@@ -95,7 +104,8 @@ def create_external_table(file_id, table_name, bq_client):
     table = bigquery.Table(table_ref, schema=schema)
     # provide the external table configuration
     table.external_data_configuration = external_config
-    # create the table
+    # Remove leftover staging table from a previous run, then create fresh
+    delete_table(table_name, bq_client)
     table = bq_client.create_table(table)
     # print the table name for code progress monitoring
     print(f"External table {table.table_id} created successfully.")

@@ -1,16 +1,26 @@
-from variables import *
 import datetime
 import sys
 import os
-from tqdm import tqdm
+import importlib.util
 
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Load variables from same folder (scripts/) so key_google_sheets etc. are always defined
+_vars_path = os.path.join(script_dir, "variables.py")
+_spec = importlib.util.spec_from_file_location("variables_local", _vars_path)
+_vars = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_vars)
+for _name in dir(_vars):
+    if not _name.startswith("_"):
+        globals()[_name] = getattr(_vars, _name)
+
+from tqdm import tqdm
 from oauth2client.service_account import ServiceAccountCredentials
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
 
-script_dir = os.path.dirname(__file__)
-project_root = os.path.abspath(os.path.join(script_dir, '..'))
-sys.path.append(project_root)
+project_root = os.path.abspath(os.path.join(script_dir, ".."))
+if project_root not in sys.path:
+    sys.path.append(project_root)
 
 # ============================================================================
 # CONFIGURATION - CHANGE THESE VALUES AS NEEDED
@@ -18,7 +28,7 @@ sys.path.append(project_root)
 
 # Set the folder ID you want to delete files from
 # Get this from Google Drive URL: https://drive.google.com/drive/folders/FOLDER_ID_HERE
-FOLDER_ID_TO_DELETE = "19A0K3ni_U7j573-vU7LfkLVnTBfanjQr"
+FOLDER_ID_TO_DELETE = "1tTawCZ4ihAfDeKp1Xac9QiDIBICfmMuM"
 
 # Set to True to delete files, False to just list them (dry run)
 DELETE_MODE = True

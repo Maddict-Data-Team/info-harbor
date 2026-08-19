@@ -2,16 +2,16 @@
 # Format: list of dictionaries with long, lat, name, country, city, radius (optional)
 
 # Campaign code name (e.g., 122) - this will be used to create table {code_name}_pois
-code_name = 173
+code_name = 180
 
 pois = [
     {
-        "longitude": 55.7268202,
-        "latitude": 24.2449487,
-        "name": "Al Jimi Mall",
+        "longitude": 55.72,
+        "latitude": 24.24,
+        "name": "Mall Name",
         "country": "UAE",
         "city": "Dubai",
-        "radius": 325  # Optional: radius in meters (default: 50 if not specified)
+        "radius": 100  # Optional: radius in meters (default: 50 if not specified)
     },
     # {
     #     "longitude": 46.6753,

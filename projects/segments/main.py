@@ -43,7 +43,7 @@ def main():
     print_title()
     
     bq_client, drive_service = authenticate_get_clients()
-    
+
     # print("🗂️  Resetting folders...")
     # reset_folders()   
     
@@ -52,12 +52,12 @@ def main():
 
     # Choose One
     print("✂️  Splitting segment files...")
-    # move_without_splitting()
-    split_files()
+    move_without_splitting()
+    # split_files()
 
     print("☁️  Transferring files to Google Drive...")
     segment_dict = transfer_files_to_drive()
-    
+
     print("📈 Pushing segments to BigQuery...")
     run_push_to_bq(segment_dict, bq_client)
     

@@ -1,10 +1,14 @@
-code_name = "161" # 122
+code_name = "183" # 122
 
-campaign_name = "Boots" # Redoxon
+campaign_name = "Galleria Placelift 26Q1" # Redoxon
 
 countries = ["UAE"] #,"","","",""] # ,
-
-segments = ["Female", "Pharmacy Goers", "Shopping Mall Goers", "Beauty Enthusiasts/Personal Care ", "Health Enthusiasts"]
+# segments = [
+#     "Car Owners",
+#     "Potential Car Buyers",
+#     "Outdoor Lovers",
+#     "Families"
+# ]
 
 # ,"Custom_Foodies"
 # KSA 
@@ -34,6 +38,8 @@ dict_custom_segments = {
     #     "radius":50
     # }
 }
+
+segments = list(dict_custom_segments.keys())
 
 excluded_segments = []  #  "Male"
 

@@ -1,15 +1,15 @@
-campaign_name = "Aldar" # MyNameIsJeff
+campaign_name = "Galleria Placelift 26Q1" # MyNameIsJeff
 
 countries = ["UAE"] # "UAE" ,"KSA"
 
-start_date = "2025-11-01" # "2024-06-10"
+start_date = "2026-03-01" # "2024-06-10"
 
-end_date = "2025-12-10" # "2024-06-30"
+end_date = "2026-12-31" # "2024-06-30"
 
 type = "Placelift" # Dashboard or Placelift
 
-backend_reports = [67300]
+backend_reports = [0]
 
 time_interval = 7
 
-has_segments = 0
+has_segments = 1
