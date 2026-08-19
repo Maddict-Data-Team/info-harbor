@@ -41,5 +41,11 @@ data/
 .ipynb_checkpoints/
 *__pycache__*
  
-# Ignore the files
-test*
+# Test tooling / artifacts (NOT the tests/ suite itself -- IH-030)
+.pytest_cache/
+.coverage
+htmlcov/
+tests-output/
+
+# Local virtualenv for offline test tooling
+.venv/

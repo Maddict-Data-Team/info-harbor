@@ -1,0 +1,1246 @@
+# Info-Harbor Code Audit Register
+
+This is the living, per-finding issue register for the Info-Harbor modernization
+effort. It exists so management and engineers can see, at a glance: what was
+found, how severe it is, whether it has been fixed, and exactly what evidence
+backs the claim. See `docs/modernization-log.md` for the chronological record of
+work, and the root `README.md` "Modernization Status" section for a plain-language
+summary.
+
+**Audit baseline for this document:** branch `feature/safety-test-baseline`,
+branched from `dev` at commit `810e30b5451e962bf7524bf8f22cb341322dda87` (a local
+WIP commit made to preserve uncommitted work found on `dev`; the commit before
+it, `296a157`, is the last commit that existed on `origin/dev` at audit time).
+`dev` itself descends from `main` at `c0f2e3779c57de37aa48fa48b9edf92e4170b3cb`,
+which was the originally-requested baseline. Every finding below was verified
+by reading this branch's actual current file content, not carried over
+unchecked from an earlier audit of `main` -- where a finding also existed
+identically on `main`, that is noted.
+
+**Severity:** Critical / High / Medium / Low
+**Status:** Open / In Progress / Fixed / Accepted Risk / Needs Validation
+
+A finding is only listed as a "Confirmed defect" if it was reproduced by reading
+the exact current source (file + line) or by an automated test in `tests/`.
+Anything not yet reproduced this way is listed under "Suspected issues requiring
+validation" instead, however plausible it looks.
+
+---
+
+## Index
+
+| ID | Title | Severity | Status |
+|----|-------|----------|--------|
+| [IH-001](#ih-001) | Wrong-campaign global override in segments query builder | Critical | Open |
+| [IH-002](#ih-002) | Silent cloud pipeline failure -- bare `except` + unconditional HTTP 200 | Critical | Open |
+| [IH-003](#ih-003) | Campaign marked `Finished` before reporting succeeds | High | Open |
+| [IH-004](#ih-004) | Database-loaded campaigns lose segment definitions | Critical | Open |
+| [IH-005](#ih-005) | `"Placelift NO BER"` bypasses the type normalizer and matches no section | Critical | Open |
+| [IH-006](#ih-006) | `"Retail Intelligence Dashboard"` type mismatch | High | Open |
+| [IH-007](#ih-007) | Served/control disjointness broken by a newline/whitespace mismatch | Critical | Open |
+| [IH-008](#ih-008) | Control-pool subsampling crashes for segments under 100,000 raw DIDs | Critical | Open |
+| [IH-009](#ih-009) | Raw segment CSVs opened in append mode; duplicate header/rows on rerun | High | Open |
+| [IH-010](#ih-010) | `reset_folders()` never invoked by the default segments flow | High | Open |
+| [IH-011](#ih-011) | Google Drive re-upload creates duplicate files on rerun | High | Open |
+| [IH-012](#ih-012) | Unawaited tracker `INSERT` jobs; `id` assignment can race | Medium | Open |
+| [IH-013](#ih-013) | `query_HG` SQL references an unbound alias | Medium | Open |
+| [IH-014](#ih-014) | Broken `projects.campaign_tracker` import path | Medium | Open |
+| [IH-015](#ih-015) | `projects/segments/main_new.py` fails at import | Medium | Open |
+| [IH-016](#ih-016) | `get_metadata` reads the loop variable after the loop ends | Low | Open |
+| [IH-017](#ih-017) | `[Common Queries]` recursion swaps date arguments (latent) | Medium | Open |
+| [IH-018](#ih-018) | Bare-date `BETWEEN` window drops the final day / UTC-vs-local-day skew | High | Open |
+| [IH-019](#ih-019) | `time_interval` accepted but never used in `get_run_dates` | Low | Open |
+| [IH-020](#ih-020) | `SELECT DISTINCT *` dedupe can destroy legitimate duplicate rows | Medium | Open |
+| [IH-021](#ih-021) | Backend-report file matching uses a Drive substring search | Medium | Open |
+| [IH-022](#ih-022) | Stale external table reuse in `upload_backend.py` | Critical | **Fixed** |
+| [IH-023](#ih-023) | `segments/main.py` `NameError` on undefined `bq_client` | Medium | **Fixed** |
+| [IH-024](#ih-024) | `push_to_bq.py` external staging table `Conflict`-swallow | Medium | **Fixed** |
+| [IH-025](#ih-025) | Flask UI has no authentication or CSRF protection on write routes | Critical | Open |
+| [IH-026](#ih-026) | Flask app runs with `debug=True` on `host='0.0.0.0'` | Critical | Open |
+| [IH-027](#ih-027) | Hardcoded Flask `secret_key` committed in source | High | Open |
+| [IH-028](#ih-028) | `delete_from_drive.py` ships with `DELETE_MODE = True` by default | High | Open |
+| [IH-029](#ih-029) | Inconsistent credential model (key files vs. Secret Manager) | Medium | Open |
+| [IH-030](#ih-030) | Unparameterized SQL and Drive query-string interpolation throughout | High | Open |
+| [IH-031](#ih-031) | `{codename}_visitors` uses `WRITE_APPEND` with an overlapping window | High | Open |
+| [IH-032](#ih-032) | Combined `{code_name}_Segments` table appended without dedupe on rerun | Medium | Open |
+| [IH-033](#ih-033) | O(lines) redundant Drive upload calls in the old `transfer_to_drive.py` | Low | **Fixed** |
+| [IH-034](#ih-034) | CI deploys to production on every push to `main`, no tests, no gate | High | Open |
+| [IH-035](#ih-035) | `pandas` imported by `data_validation.py` but undeclared in deployed requirements | Low | Open |
+| [IH-036](#ih-036) | `projects/poi/` added with no tests, no CI wiring, no prior documentation | Medium | Needs Validation |
+| [IH-037](#ih-037) | No test suite existed; `.gitignore`'s `test*` pattern actively blocked one | Critical | **Fixed** |
+| [IH-038](#ih-038) | `projects/poi/` was undocumented prior to this branch | Low | **Fixed** |
+| [IH-039](#ih-039) | `aaa` file may indicate repository/production drift | Medium | Needs Validation |
+| [IH-040](#ih-040) | Unexplained `keys/test-google-sheet.json` credential file | Low | Needs Validation |
+| [IH-041](#ih-041) | `/api/campaigns/add` reports success without persisting anything | Low | Needs Validation |
+| [IH-042](#ih-042) | `.gitignore` fix revealed a previously-hidden, untracked, live-credential test script | Medium | Needs Validation |
+
+---
+
+## Confirmed defects
+
+### IH-001
+**Title:** Wrong-campaign global override in segments query builder
+**Severity:** Critical
+**Status:** Open
+**Date discovered:** 2026-08-19
+
+**Business impact:** Running the segments pipeline for one campaign can silently write another campaign's code name into the generated SQL, meaning audience data can be extracted, tagged, and published under the wrong campaign identifier without any error being raised.
+
+**Technical explanation:** `build_query()` in `projects/segments/scripts/query_orchestrator.py` accepts a `codename` parameter, but the actual SQL substitution uses the module-level global `code_name` instead -- a name that is bound once, at import time, from `from input import *` (`projects/segments/input.py`). Every worker module in `projects/segments/scripts/` (`get_segments_raw.py`, `split_segments.py`, `push_to_bq.py`, `transfer_to_drive.py`, `create_be_table.py`) performs the same `from input import *` at its own import time, so each holds its own frozen copy of whatever `input.py` said at that moment. `main_new.py`'s attempt to fix this by injecting the requested campaign's variables into its *own* globals (`inject_campaign_variables(campaign_code_name, globals())`) cannot reach modules that were already imported with their own copies.
+
+**Exact file and line evidence:**
+- `projects/segments/scripts/query_orchestrator.py:135-136` -- `build_query(query, country, codename=0, radius=0, segment="", filters="")`
+- `projects/segments/scripts/query_orchestrator.py:162` -- `query = query.replace("{code_name}", code_name)` (uses the global, not the `codename` parameter above)
+- `projects/segments/scripts/query_orchestrator.py:17` -- `from input import *` (binds `code_name` at import time)
+- `projects/segments/input.py:1` -- `code_name = "183"` (current value on this branch; was `"167"` on the `main` baseline)
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_segments_wrong_campaign_global.py -v
+```
+This monkeypatches the module's `code_name` global to a sentinel value distinct from an explicitly-passed `codename="143"` argument, calls the real `build_query()`, and asserts the sentinel (not `"143"`) appears in the output. No network, no credentials.
+
+**Recommended correction:** Have `build_query` use its `codename` parameter exclusively; remove the `{code_name}` placeholder's dependence on the module global, or explicitly re-derive it from the parameter at the top of the function. This is a pipeline-logic change and is **out of scope** for `feature/safety-test-baseline` -- it belongs in a dedicated correctness-fix branch, informed by this finding's regression test.
+
+**Tests required:** `tests/unit/test_segments_wrong_campaign_global.py` (added, passing, characterizes the bug). A second test proving the *fix* once one lands (assert the parameter wins, not the global).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-002
+**Title:** Silent cloud pipeline failure -- bare `except` + unconditional HTTP 200
+**Severity:** Critical
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on `main` at `c0f2e37`; file unchanged on this branch)
+
+**Business impact:** When the scheduled reporting run fails for any reason -- misconfigured campaign type, a BigQuery error, a bad date -- the Cloud Function still reports success. Nobody is alerted; the failure is only visible if someone manually reads Cloud Function logs.
+
+**Technical explanation:** `run_by_codename()` wraps the entire reporting pipeline in a bare `except:` that prints a traceback and returns the string `"error"`. The caller discards that return value. The top-level Cloud Function entry point then always returns HTTP 200 regardless of what happened inside.
+
+**Exact file and line evidence:**
+- `projects/automation/query_orchestrator.py:427-429`:
+  ```
+      except:
+          traceback.print_exc()
+          return "error"
+  ```
+- `projects/automation/main.py:91-92` -- the loop that calls `run_by_codename` and never inspects its return value
+- `projects/automation/main.py:133-136`:
+  ```
+  def main(request=None):
+      query_bigquery_and_process()
+      return ("Function executed successfully", 200)
+  ```
+- Secondary swallow: `projects/automation/main.py:68-70` (`except Exception as e: print(...); continue` around the BER upload step)
+
+**How to reproduce / verify safely:** Static reading confirms the control flow directly (no runtime call needed to see that every code path through `main()` reaches the same `return (..., 200)`). `tests/unit/test_pipeline_type_mapping.py` proves one concrete trigger for the `except:` (a `NoSectionError` from IH-005/IH-006) without touching BigQuery.
+
+**Recommended correction:** Re-raise or propagate a non-200 response on failure; replace the bare `except:` with typed exception handling that distinguishes "skip this campaign, continue with others" from "the whole run failed."
+
+**Tests required:** An integration-style test with `tests/fakes/fake_bigquery.py` that forces `run_by_codename` to raise, then asserts the Cloud Function's HTTP response reflects the failure (requires the pipeline-logic fix first; the current code has no failure-reporting path to test).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-003
+**Title:** Campaign marked `Finished` before reporting succeeds
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on `main`; file unchanged on this branch)
+
+**Business impact -- corrected framing:** A campaign whose final reporting run fails is still marked `Finished` in the tracker. **This does not make the campaign unrecoverable** -- `custom_codename.py` selects by `code_name` with no status filter, so an operator can manually rerun it. The real risks are: (1) **automatic retry is permanently lost**, since the scheduled selection query excludes `Finished` rows; (2) **manual recovery is unaudited** -- nothing distinguishes a manual rerun from a normal scheduled one in the tracker; (3) a manual rerun is **not idempotent**, so it can duplicate appended data (IH-031) or reuse a stale intermediate table if run between two runs' half-completed state.
+
+**Technical explanation:** `start_the_process()` issues an `UPDATE ... SET status = 'Finished'` as soon as a row's status is `Completion Period`, *before* `run_by_codename()` (the actual reporting work) is called for that code name.
+
+**Exact file and line evidence:**
+- `projects/automation/main.py:76-84`:
+  ```
+      if status == stage_3:
+          print(f"Updating for {code_name} because it's status is {status}")
+          update_query = f"""
+              UPDATE `maddictdata.Metadata.{tbl_cmpgn_tracker}`
+              SET status = 'Finished'
+              WHERE id = {id};
+          """
+          run_query(update_query, bq_client)
+  ```
+- `projects/automation/main.py:91-92` -- `run_by_codename` is only called after the loop above, for the set of `unique_code_names` collected during it
+- Automatic-retry loss: `projects/automation/variables.py:119` (`WHERE status NOT IN ('Finished', 'On Hold')`) and `:129-133` (`q_select_active_interval`, which only selects `Active`+interval-due or `Completion Period` rows)
+- Manual recovery remains possible: `projects/automation/custom_codename.py:37-40` calls `get_campaign_tracker_data`, which runs `[Setup] query_metadata` (`projects/automation/queries.ini:6-8`) -- `WHERE code_name = {codename}`, with **no status filter**
+- Recovery is unaudited: `run_by_codename` ends with `update_last_update` (`query_orchestrator.py:426`), which bumps `last_update` identically whether the run was scheduled or manual; nothing records which
+- Recovery is not idempotent: a rerun re-appends to `{codename}_visitors` (IH-031) and, prior to this branch's fix, could reuse a stale `{backend_report}_new` table (IH-022, now Fixed)
+
+**How to reproduce / verify safely:** Static reading of the ordering above. Also hardcodes the literal `'Finished'` instead of the `stage_4` constant (`projects/automation/variables.py:46`), a minor internal-consistency issue noted alongside this finding.
+
+**Recommended correction:** Move the status write to occur only after `run_by_codename` succeeds for that code name; add a distinct status or audit column (see `docs/modernization-spec.md`'s proposed `Campaign_Runs` model) that records whether a run was scheduled or manual, and its outcome.
+
+**Tests required:** Once the pipeline is refactored to separate "mark complete" from "ran successfully," a test asserting the status write only happens after a successful `FakeBigQueryClient`-backed run.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-004
+**Title:** Database-loaded campaigns lose segment definitions
+**Severity:** Critical
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on `main`; file unchanged on this branch)
+
+**Business impact:** When campaign configuration is loaded from BigQuery (the primary path), every campaign silently loses its list of audience segments, custom segment filters, and exclusion list -- even for campaigns whose real segment definitions exist in the hardcoded fallback files.
+
+**Technical explanation:** `create_campaign_config_from_db()` builds a `CampaignConfig` with `segments=[]`, `custom_segments={}`, `excluded_segments=[]` hardcoded, because those fields are not read from the database. Worse, `_load_campaigns()` replaces the entire hardcoded registry with the database result set whenever the database is reachable, rather than merging the two, so a campaign that previously had real segment data available via the hardcoded fallback loses it as soon as the database path succeeds.
+
+**Exact file and line evidence:**
+- `shared/config/campaigns/database_loader.py:94-113`, specifically `:108-110`:
+  ```
+          # Default values for fields not in database
+          segments=[],
+          custom_segments={},
+          excluded_segments=[],
+  ```
+- `shared/config/campaigns/__init__.py:27-35`:
+  ```
+          db_campaigns = get_database_campaigns()
+          if db_campaigns:
+              print(f"[OK] Loaded {len(db_campaigns)} campaigns from database")
+              _campaigns_cache = db_campaigns
+              return _campaigns_cache
+  ```
+  (replaces, does not merge with, `HARDCODED_CAMPAIGNS`)
+
+**How to reproduce / verify safely:** Static reading; a live reproduction would require a real BigQuery connection to `Campaign_Tracker`, which is out of scope for this offline audit and this branch.
+
+**Recommended correction:** Extend the `Campaign_Tracker` schema (or a related table) to store segment definitions, or merge database-sourced fields with the hardcoded fallback per campaign rather than replacing the whole registry.
+
+**Tests required:** A unit test asserting `create_campaign_config_from_db` preserves segment data once the schema/merge logic changes; until then, a characterization test asserting current (broken) behavior would be useful in a follow-up branch.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-005
+**Title:** `"Placelift NO BER"` bypasses the type normalizer and matches no `queries.ini` section
+**Severity:** Critical
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on `main`; file unchanged on this branch)
+
+**Business impact:** A campaign whose `type` is stored as exactly `"Placelift NO BER"` (as opposed to being derived by the normalizer) produces **zero reporting output on every scheduled run**, and every run reports success (IH-002). This was traced with the exact reproduction case supplied by the project owner: `code_name=113`, `type="Placelift NO BER"`, `backend_report=0`, `segments=1`.
+
+**Technical explanation:** `get_metadata()`'s normalizer block only rewrites five exact literal strings (`"Placelift Report"`, `"Placelift Dashboard"`, `"Placelift"`, `"Standard Placelift"`, `"Comparative Analysis"`). `"Placelift NO BER"` is none of them, so it passes through unchanged. The real `queries.ini` section is `[Placelift No BER]` (mixed case: `No`, not `NO`). Python's `configparser` lowercases *option* names but keeps **section names case-sensitive**, so `config.get("Placelift NO BER", "queries")` raises `configparser.NoSectionError`, which is then swallowed by IH-002.
+
+Note the irony this traces out: a campaign with `segments=1, backend_report=0` and a *plain* `type="Placelift"` (or `"Standard Placelift"`, etc.) **would** resolve, via the normalizer's `elif backend_report == 0` branch, to exactly `"Placelift No BER"` -- the correct section. Writing the target section name directly into the metadata is precisely what breaks it.
+
+**Exact file and line evidence:**
+- `projects/automation/query_orchestrator.py:223-229` (the normalizer's exact literal list)
+- `projects/automation/query_orchestrator.py:290` -- `queries = config.get(pipeline_type, "queries").split(",")`
+- `projects/automation/queries.ini:429` -- `[Placelift No BER]` (confirmed via case-sensitive grep: no section anywhere in the file uses uppercase `NO`)
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_pipeline_type_mapping.py -v -k PlacementNoBer
+```
+This builds the exact `code_name=113` row via `tests/fixtures/campaign_metadata.py::placelift_no_ber_113`, feeds it through the real `get_metadata()` against a `FakeBigQueryClient`, and asserts (a) the type is *not* rewritten and (b) `configparser.NoSectionError` is raised against the real `queries.ini`. No network, no credentials.
+
+**Recommended correction:** Normalize `type` comparisons case-insensitively (or canonicalize at write time in the campaign-tracker), and add a startup-time validation step that checks every distinct `type` value present in `Campaign_Tracker` against the section list, failing loudly instead of silently on an unmatched value.
+
+**Tests required:** `tests/unit/test_pipeline_type_mapping.py` (added, passing). A follow-up test once the fix lands, asserting `"Placelift NO BER"` now resolves to `[Placelift No BER]`.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-006
+**Title:** `"Retail Intelligence Dashboard"` type mismatch
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on `main`; file unchanged on this branch)
+
+**Business impact:** Retail campaigns configured with the hardcoded fallback type silently produce no reports; same failure class as IH-005, same silent swallow via IH-002.
+
+**Technical explanation:** `campaign_144_retail.py` sets `type="Retail Intelligence Dashboard"`. The only matching `queries.ini` section is `[Retail Intelligence]` (no `"Dashboard"` suffix), and this string is not one of the five literals the normalizer rewrites.
+
+**Exact file and line evidence:**
+- `shared/config/campaigns/campaign_144_retail.py:12` -- `type="Retail Intelligence Dashboard"`
+- `projects/automation/queries.ini:236` -- `[Retail Intelligence]`
+- `projects/automation/query_orchestrator.py:223-229` (normalizer does not cover this string)
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_pipeline_type_mapping.py -v -k RetailIntelligence
+```
+
+**Recommended correction:** Either rename the section to match the campaign config's `type` value, or vice versa; add the startup-time validation recommended under IH-005 to catch the whole class of mismatch at once.
+
+**Tests required:** `tests/unit/test_pipeline_type_mapping.py` (added, passing).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-007
+**Title:** Served/control disjointness broken by a newline/whitespace mismatch
+**Severity:** Critical
+**Status:** Open
+**Date discovered:** 2026-08-19 -- **NEW on this branch**; this file did not have this bug at the `main` baseline (`c0f2e37`). The whole `read_data_folder`/`Write_output_to_files` pair in `projects/segments/scripts/split_segments.py` was rewritten as part of the uncommitted work found on `dev` (now committed as `810e30b`, see `docs/modernization-log.md` entry 2026-08-19).
+
+**Business impact:** The control group is supposed to be excluded from the served (exposed) audience -- that separation is the entire statistical basis for a placelift measurement. On this branch, that exclusion silently does not happen: every control-group device ID is *also* written into the served output, contaminating every placelift report this pipeline produces.
+
+**Technical explanation:** `Write_output_to_files()` rewrites the served CSV by re-reading each raw file and checking `if did not in control:` before writing. `did` here is a **raw line from the file object**, which includes the trailing `"\n"`; `control` is a `set` of **already-stripped** DID strings (built earlier by `get_control()`, which strips lines before sampling). A string with a trailing newline is never equal to its stripped counterpart, so `did not in control` is `True` for every row, unconditionally -- the exclusion check can never fire.
+
+**Exact file and line evidence:**
+- `projects/segments/scripts/split_segments.py:119-132`:
+  ```
+          with open("projects/segments/data/raw/" + file) as inpf:
+              inpf.readline()
+              with open(
+              "projects/segments/data/served/" + names[i] + "_served.csv", "w"
+              ) as outf:
+                  outf.write("DID\n")
+                  for did in inpf:
+                      if did not in control:
+                          outf.write(did.strip() + "\n")
+  ```
+- `control` is built as stripped strings by `get_control()`: `projects/segments/scripts/split_segments.py:82-84`:
+  ```
+      controlled_segment = random.sample(sorted(for_controlled), controlled_size)
+      controlled_segment = set(controlled_segment)
+  ```
+  where `for_controlled` was built from `line.strip()` values at `:65`.
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_split_segments_control.py -v -k ServedControlOverlapBug
+```
+This calls the real, unmodified `Write_output_to_files()` against a temp fixture directory (via the `isolated_segments_workspace` fixture) and asserts that DIDs placed in the control set appear in the resulting served CSV. Confirmed empirically: `"did-000\n" in {"did-000"}` evaluates to `False` in Python, while `"did-000\n".strip() in {"did-000"}` evaluates to `True`. No network, no credentials.
+
+**Recommended correction:** Compare `did.strip()` (or the already-consistent stripped values) against `control`, not the raw line.
+
+**Tests required:** `tests/unit/test_split_segments_control.py` (added, passing, marked `# BUG: IH-007`). A follow-up test asserting disjointness once fixed (the current test explicitly documents it should be inverted to an assertion of *no* overlap once this is corrected).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-008
+**Title:** Control-pool subsampling crashes for segments under 100,000 raw DIDs
+**Severity:** Critical
+**Status:** Open
+**Date discovered:** 2026-08-19 -- **NEW on this branch** (same rewrite as IH-007).
+
+**Business impact:** Any segment with fewer than 100,000 raw device IDs -- a realistic size for most custom or niche segments -- crashes the entire `split_files()` run with an unhandled exception, halting segment processing for the whole campaign, not just that one segment.
+
+**Technical explanation:** `read_data_folder()` now calls `random.sample([line.strip() for line in inpf], k=100000)` unconditionally for every segment file, with no check that the file actually has 100,000 lines. `random.sample` raises `ValueError: Sample larger than population or is negative` whenever the population is smaller than `k`.
+
+**Exact file and line evidence:**
+- `projects/segments/scripts/split_segments.py:64-65`:
+  ```
+              # strip any spaces or new lines and save the DID in a set
+              temp_set = set(random.sample([line.strip() for line in inpf],k=100000))
+  ```
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_split_segments_control.py -v -k ControlPoolSubsamplingCrash
+```
+Writes a 50-line fixture raw CSV and asserts `read_data_folder()` raises `ValueError`. No network, no credentials.
+
+**Recommended correction:** Guard the sample size with `min(100000, len(population))`, or skip subsampling entirely below a threshold. Separately worth reviewing: capping the *control candidate pool* at 100,000 per segment file (rather than sampling from the full population) can also change which devices are eligible for the control group on large segments -- a statistical design question, not just a crash bug, and is **Needs Validation** pending discussion with whoever owns the placelift methodology.
+
+**Tests required:** `tests/unit/test_split_segments_control.py` (added, passing, marked `# BUG: IH-008`).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-009
+**Title:** Raw segment CSVs opened in append mode; duplicate header/rows on rerun
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 (present at main; file changed on this branch but the append-mode bug survived the rewrite)
+
+**Business impact:** Rerunning segment extraction for the same campaign on the same day appends a second `DID` header row into the middle of the raw CSV and duplicates every device ID already fetched, inflating segment counts and corrupting downstream files.
+
+**Technical explanation:** `get_raw_segments()` opens the per-segment raw CSV with mode `'a'` (append) and unconditionally writes a `"DID\n"` header on every call, keyed only by a same-day timestamp in the filename (`%Y%m%d`). Nothing clears this file between runs unless `reset_folders()` is called first (see IH-010).
+
+**Exact file and line evidence:**
+- `projects/segments/scripts/get_segments_raw.py:45` -- `now = datetime.datetime.now().strftime("%Y%m%d")`
+- `projects/segments/scripts/get_segments_raw.py:50-51`: the file is opened with `'a'` and `outf.write("DID\n")` runs unconditionally on every call.
+
+**How to reproduce / verify safely:** Static reading; a full reproduction requires two live BigQuery-backed runs, which is out of scope offline. The append-mode and unconditional-header pattern is directly visible in the source.
+
+**Recommended correction:** Open with mode `'w'` and only write the header if the file did not already exist, or truncate-then-write; alternatively fail fast if the target file already exists for the current run.
+
+**Tests required:** A test asserting a second call to `get_raw_segments` against an existing file does not duplicate the header (deferred: requires mocking the BigQuery row iterator, planned for a follow-up branch).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-010
+**Title:** `reset_folders()` never invoked by the default segments flow
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 -- worse on this branch than at main: main had the reset call commented out too, but this branch's `projects/segments/main.py` was substantially rewritten and still leaves it commented out.
+
+**Business impact:** Directly enables IH-009 (and stale-file accumulation generally): without a folder reset between runs, `data/raw`, `data/served`, and `data/controlled` accumulate files from every prior run of every prior campaign that used this machine/environment.
+
+**Technical explanation:** `projects/segments/main.py`'s `main()` calls `authenticate_get_clients()`, then `move_without_splitting()` (not even `split_files()`), `transfer_files_to_drive()`, `run_push_to_bq()`, `create_BER_Table()` -- `reset_folders()` and `get_raw_segments()` are both commented out.
+
+**Exact file and line evidence:**
+- `projects/segments/main.py:46-52` -- the calls to `reset_folders()` and `get_raw_segments(...)` are both commented out immediately after `bq_client, drive_service = authenticate_get_clients()`.
+
+**How to reproduce / verify safely:** Static reading; the comments are unambiguous.
+
+**Recommended correction:** Either uncomment the reset/fetch steps (if this file is meant to be runnable end-to-end) or, if it is intentionally a partial/manual-step script, document that clearly at the top of the file so an operator does not assume a clean run.
+
+**Tests required:** None specific; covered indirectly by any future integration test asserting a full run starts from an empty `data/` tree.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-011
+**Title:** Google Drive re-upload creates duplicate files on rerun
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 (present at main; `transfer_to_drive.py` was substantially rewritten on this branch -- see IH-033 for what that rewrite fixed -- but this specific defect was not addressed)
+
+**Business impact:** Rerunning the segments pipeline (accidentally, or as part of a manual recovery per IH-003) creates additional same-named CSV files in the campaign's Drive folder rather than replacing the existing one. Google Drive permits duplicate titles in one folder, so nothing prevents this, and downstream consumers of that folder (including `push_to_bq.py`'s external-table step) may pick up whichever file id happens to be returned.
+
+**Technical explanation:** `transfer()` unconditionally calls `service.files().create(...)` for every `.csv` file found under the data directory; there is no check for an existing file with the same name in the destination folder before uploading, and no delete-then-upload step.
+
+**Exact file and line evidence:**
+- `projects/segments/scripts/transfer_to_drive.py:133-186` (the `try:` block that always calls `service.files().create(body=metadata, ...)`, both the resumable and non-resumable branches)
+- `find_or_create_folder()` (`:54-78`) reuses the existing campaign folder by design (correct for folders), but nothing analogous exists for files
+
+**How to reproduce / verify safely:** Static reading; `tests/fakes/fake_drive.py` is deliberately built to permit duplicate titles (matching real Drive behavior) so a future regression test can assert this without hitting real Drive -- not yet wired in, since exercising it meaningfully requires making `transfer_to_drive.py` accept an injectable Drive service, which is pipeline-logic work out of scope for this branch.
+
+**Recommended correction:** Before uploading, search the destination folder for a file with the same name; delete it (or version it) before creating the new one.
+
+**Tests required:** A test using `tests/fakes/fake_drive.py::FakeDriveService`, once `transfer_to_drive.py` is refactored to accept an injectable Drive service.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-012
+**Title:** Unawaited tracker `INSERT` jobs; `id` assignment can race
+**Severity:** Medium
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; `projects/campaign-tracker/main.py` unchanged on this branch)
+
+**Business impact:** Campaign metadata rows can silently fail to be written (the failure is never surfaced), and under concurrent execution, two countries' rows can compute the same "next id" and either collide or leave a gap.
+
+**Technical explanation:** `metadata_placelift()` calls `client.query(query)` for each country's `INSERT` without calling `.result()`, so the BigQuery job is fired and forgotten; any job-level error is invisible to the caller. Each country's `INSERT` independently recomputes `COALESCE(MAX(id), 0) + 1 + {index}` from current table state, so if the jobs are not strictly ordered, two countries can observe the same `MAX(id)`.
+
+**Exact file and line evidence:**
+- `projects/campaign-tracker/main.py:70-71` -- `client.query(query)` with no `.result()` call
+- `projects/campaign-tracker/main.py:55` -- `COALESCE(MAX(id), 0) + 1 + {index}`
+
+**How to reproduce / verify safely:** Static reading; reproducing the race requires a real BigQuery table under concurrent load, out of scope offline.
+
+**Recommended correction:** Call `.result()` on the query job and handle failures explicitly; move to a single multi-row `INSERT ... VALUES` per campaign (all countries at once) so id assignment is computed once, or use a proper surrogate key generator.
+
+**Tests required:** None offline-testable without a live BigQuery table; note this as a live-parity test candidate in `docs/modernization-spec.md`.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-013
+**Title:** `query_HG` SQL references an unbound alias
+**Severity:** Medium
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; `projects/segments/queries.ini` unchanged on this branch)
+
+**Business impact:** Any campaign that uses the `HG` ("Near By Residents") segment type will fail with a SQL error the moment that segment is queried.
+
+**Technical explanation:** The query aliases the home-graph table as `HG` but its join predicate references `ls.Longitude` / `ls.latitude` -- an alias (`ls`) that is never bound anywhere in the query.
+
+**Exact file and line evidence:**
+- `projects/segments/queries.ini:18-23` -- `query_HG` aliases the source table `as HG` at line 19, then references `ls.Longitude`/`ls.latitude` at line 23.
+
+**How to reproduce / verify safely:** Static reading of the SQL text is sufficient -- `ls` does not appear in any `FROM`/`JOIN` clause in this query. Confirming the resulting BigQuery error requires a live query, out of scope offline.
+
+**Recommended correction:** Change `ls.Longitude`/`ls.latitude` to `HG.Longitude`/`HG.latitude` (or whatever the intended source table/alias is).
+
+**Tests required:** None offline (this is a live-SQL-only defect); consider a lightweight "does every query template reference only its own declared aliases" static linter as a longer-term guard.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-014
+**Title:** Broken `projects.campaign_tracker` import path
+**Severity:** Medium
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; both call sites unchanged on this branch, and a third call site was added -- see IH-025)
+
+**Business impact:** Every UI action and CLI path that is supposed to run the campaign tracker fails immediately with `ModuleNotFoundError`, silently caught and shown only as a flash message or swallowed error in the UI.
+
+**Technical explanation:** The real directory is `projects/campaign-tracker` (hyphen), which is not a syntactically valid Python package/module name. Code that does `from projects.campaign_tracker.main_new import main` (underscore) can never resolve.
+
+**Exact file and line evidence:**
+- `ui/app.py:130` -- `from projects.campaign_tracker.main_new import main as tracker_main` (inside `run_campaign_action`)
+- `ui/app.py:161` -- second occurrence inside `api_run_campaign_action`
+- `ui/app.py:198` -- third occurrence inside `api_run_all_trackers` (new on this branch, see IH-025)
+- `campaign_manager.py:111` -- same broken import, unchanged file (identical to main baseline)
+- No `__init__.py` exists anywhere under `projects/` on this branch (confirmed via directory listing), so this is a real, unconditional `ModuleNotFoundError`, not merely a style issue.
+
+**How to reproduce / verify safely:** `python -c "import projects.campaign_tracker.main_new"` raises `ModuleNotFoundError: No module named 'projects.campaign_tracker'` immediately (no network involved -- this is a pure import-resolution failure). Verified.
+
+**Recommended correction:** Either rename the directory to `campaign_tracker` (breaking any external references to the hyphenated path) or change every import site to the correct path via `importlib` machinery matching the hyphen, consistent with how other same-situation files in this repo already use `importlib.util.spec_from_file_location`.
+
+**Tests required:** A regression test asserting the intended tracker entry point is actually importable, once the fix lands (currently there is nothing valid to import).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-015
+**Title:** `projects/segments/main_new.py` fails at import
+**Severity:** Medium
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; file unchanged on this branch)
+
+**Business impact:** The "new," shared/-config-based segments entry point cannot run at all; any caller (`ui/app.py`, `campaign_manager.py`) that imports it fails before doing any work.
+
+**Technical explanation:** `main_new.py` imports the worker scripts as `from projects.segments.scripts.get_segments_raw import get_raw_segments` etc., but those scripts themselves do flat imports (`import query_orchestrator`, `from variables import *`) that require `projects/segments/scripts` to be on `sys.path`. Unlike `projects/segments/main.py` (which does `sys.path.append(scripts_dir)` before importing them), `main_new.py` never adds that directory.
+
+**Exact file and line evidence:**
+- `projects/segments/main_new.py:22-28` (the `from projects.segments.scripts.* import *` block, with no preceding `sys.path` manipulation for `scripts/`)
+- Contrast: `projects/segments/main.py:11-14` does add `scripts_dir` to `sys.path` before its own (flat-style) imports
+
+**How to reproduce / verify safely:** Reading the exact chain of imports shows this fails; not independently re-executed as a live import in this offline audit pass since it requires the full dependency set installed the same way as the test venv, and is a source-level defect visible without execution.
+
+**Recommended correction:** Add the missing `sys.path.append(...)` for `projects/segments/scripts`, or convert the worker scripts to proper package-relative imports.
+
+**Tests required:** A smoke-import test once fixed.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-016
+**Title:** `get_metadata` reads the loop variable after the loop ends
+**Severity:** Low
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; file unchanged on this branch)
+
+**Business impact:** If a campaign's metadata query returns zero rows (e.g. the code name was deleted or mistyped), the function raises an unhelpful `NameError` instead of a clear "campaign not found" error, and that `NameError` is then swallowed by IH-002.
+
+**Technical explanation:** `get_metadata()` iterates `for row in metadata_raw: countries.append(row.country)`, then reads `end_date = row.end_date` (and several other fields) after the loop, relying on Python's loop-variable leakage. This also silently takes the last row's values without verifying all rows agree, though campaign-tracker writes one independently-editable row per country.
+
+**Exact file and line evidence:**
+- `projects/automation/query_orchestrator.py:203-221`, specifically `:209` -- `end_date = row.end_date` (outside the `for` block that starts at `:204`)
+
+**How to reproduce / verify safely:** Static reading; an empty-result reproduction requires a live BigQuery query, out of scope offline.
+
+**Recommended correction:** Raise an explicit, descriptive error when `metadata_raw` is empty; document (or enforce) that all per-country rows for one code name must agree on shared fields.
+
+**Tests required:** A unit test asserting an empty `FakeBigQueryClient` result set raises a clear error once the fix lands.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-017
+**Title:** `[Common Queries]` recursion swaps date arguments (latent)
+**Severity:** Medium
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; file unchanged on this branch)
+
+**Business impact:** Currently none -- see below. The moment a date-window placeholder is added to any query under `[Common Queries]`, every one of those nine queries will silently run with the start/end dates inverted, with no error raised.
+
+**Technical explanation:** `run_pipeline_queries` is declared as `(config, codename, end_date_q, start_date_q, countries, pipeline_type, bq_client, radiuses, ...)`. The top-level call (`run_by_codename`) passes `end_date_q, start_date_q` correctly into those slots. But the function's own recursive call for `"common_queries"` passes `start_date_q, end_date_q` -- transposed relative to its own parameter order.
+
+**Exact file and line evidence:**
+- `projects/automation/query_orchestrator.py:264-268` (parameter declaration order)
+- `projects/automation/query_orchestrator.py:297-306` (the recursive call, arguments in the wrong order relative to the declaration)
+- `projects/automation/query_orchestrator.py:413-424` (the correct top-level call, for contrast)
+- Verified harmless today: `projects/automation/queries.ini:13-235` (`[Common Queries]`) contains zero `{start_date_q}`/`{end_date_q}` occurrences; the first such placeholder in the whole file is at line 255, inside `[Retail Intelligence]`.
+
+**How to reproduce / verify safely:** `python -m pytest tests/unit/test_automation_build_query.py -v -k CommonQueriesDateSwap`. This is a regression guard, not a bug reproduction: it asserts the current absence of date placeholders in `[Common Queries]`, so it starts failing the moment someone adds one -- at which point this finding should be treated as "the latent bug just went live."
+
+**Recommended correction:** Fix the call to pass `(end_date_q, start_date_q)` in the correct order, independent of whether any query currently depends on it.
+
+**Tests required:** `tests/unit/test_automation_build_query.py::TestCommonQueriesDateSwapIsCurrentlyLatentNotActive` (added, passing).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-018
+**Title:** Bare-date `BETWEEN` window drops the final day / UTC-vs-local-day skew
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; files unchanged on this branch)
+
+**Business impact:** Every reporting window silently excludes most of its own final day's data, and the boundary is computed in UTC while device activity is bucketed by local day in GST-offset markets (UAE, KSA, etc.), shifting the effective window by several hours.
+
+**Technical explanation:** `get_run_dates` returns plain `%Y-%m-%d` date strings, which are substituted into `BETWEEN "{start_date_q}" AND "{end_date_q}"` clauses. A bare date coerces to `00:00:00` at the start of that day, so `end_date_q` effectively means "up to midnight at the start of the end date," not through the end of it. Separately, `datetime.today()` is evaluated in whatever timezone the process runs in (UTC on Cloud Functions), while device timestamps are meant to represent local activity in markets offset from UTC.
+
+**Exact file and line evidence:**
+- `projects/automation/query_orchestrator.py:369-372` (bare `strftime("%Y-%m-%d")` return values)
+- `projects/automation/query_orchestrator.py:344` -- `today = datetime.today()`
+- Recurs at `projects/automation/queries.ini:255, 312-313, 458-459, 517-518, 649-650, 921-922` (`BETWEEN "{start_date_q}" AND "{end_date_q}"`)
+
+**How to reproduce / verify safely:** Static reading of the date-string format and its use in `BETWEEN` clauses; `tests/unit/test_get_run_dates.py` covers the pure date-arithmetic side (clamps, floors) but does not itself execute SQL, since that would require BigQuery.
+
+**Recommended correction:** Use full timestamps (or an explicit `< end_date_q + 1 day`) instead of bare dates in the `BETWEEN` clauses; make the timezone used for "today" explicit and match it to the markets' local day.
+
+**Tests required:** `tests/unit/test_get_run_dates.py` (added, covers the pure-function side). A SQL-text test asserting the generated `BETWEEN` clause once the fix changes its shape.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-019
+**Title:** `time_interval` accepted but never used in `get_run_dates`
+**Severity:** Low
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; file unchanged on this branch)
+
+**Business impact:** Campaigns cannot actually configure their reporting cadence via `time_interval` beyond gating whether they are selected for a run at all -- the window width itself is a hardcoded 9 days for every campaign, regardless of what `time_interval` says.
+
+**Technical explanation:** `get_run_dates(end_date, last_update, start_date, interval)` never references its `interval` parameter in its body; the 9-day lag is hardcoded via `timedelta(days=9)` in two places.
+
+**Exact file and line evidence:**
+- `projects/automation/query_orchestrator.py:340-346` (function signature includes `interval`, body never uses it)
+- `projects/automation/variables.py:114-116` (the same 9-day lag duplicated as a magic number in the `q_update_status` SQL)
+- `time_interval` is only used to gate selection: `projects/automation/variables.py:131-132`
+
+**How to reproduce / verify safely:** `python -m pytest tests/unit/test_get_run_dates.py -v -k time_interval`
+
+**Recommended correction:** Either use `interval` to size the window, or remove the parameter and document that the window is fixed at 9 days by design.
+
+**Tests required:** `tests/unit/test_get_run_dates.py::test_time_interval_parameter_does_not_affect_the_result` (added, passing).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-020
+**Title:** `SELECT DISTINCT *` dedupe can destroy legitimate duplicate rows
+**Severity:** Medium
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; `q_deduplicate_ber` unchanged, still called from the rewritten `upload_backend.py`)
+
+**Business impact:** Two genuinely identical impression records (same device, same timestamp, same creative -- which can legitimately happen) are collapsed into one, silently undercounting real activity, as a side effect of a step meant only to remove accidental duplicates from reruns.
+
+**Technical explanation:** `remove_dups()` runs `CREATE OR REPLACE TABLE ... AS SELECT DISTINCT * FROM ...`, which cannot distinguish "this row was inserted twice by a rerun" from "these two rows happen to have identical values." The schema (`schema_back_end`) has no unique key, so there is no way to tell the two cases apart with this approach.
+
+**Exact file and line evidence:**
+- `projects/automation/variables.py:151-160` (`q_deduplicate_ber`)
+- `projects/automation/upload_backend.py:322` -- `remove_dups(bq_client, code_name)` (still called, confirmed present on this branch's rewritten file)
+
+**How to reproduce / verify safely:** Static reading of the query and schema; a live reproduction requires a real BigQuery table with genuinely duplicate rows, out of scope offline.
+
+**Recommended correction:** Add a synthetic row-level identity (e.g. a load batch id + source line number) so real duplicates from reruns can be distinguished from coincidentally-identical rows, then dedupe on that identity instead of `SELECT DISTINCT *`.
+
+**Tests required:** None offline; a live-parity test comparing row counts before/after dedupe against a known-duplicate fixture is a candidate for a future integration-test tier.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-021
+**Title:** Backend-report file matching uses a Drive substring search
+**Severity:** Medium
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; `search_files_in_folder`/`navigate_and_search_file` unchanged on this branch)
+
+**Business impact:** A backend report id that is a substring of another report id (e.g. `1001` inside `21001_report.csv`) can match the wrong file, and -- combined with the append/dedupe flow -- merge another campaign's backend data into the wrong campaign's table.
+
+**Technical explanation:** The Drive query uses `name contains '{file_prefix}'`, where `file_prefix` is a bare integer backend-report id with no delimiter anchoring.
+
+**Exact file and line evidence:**
+- `projects/automation/upload_backend.py:98` -- the Drive query string concatenates `file_prefix` into a `name contains '...'` clause with no anchoring.
+
+**How to reproduce / verify safely:** Static reading; a live reproduction requires real Drive files with colliding numeric prefixes, out of scope offline.
+
+**Recommended correction:** Anchor the match (e.g. `name = '<exact filename>'` or a prefix check with a delimiter), or validate that exactly one file matches before proceeding.
+
+**Tests required:** A unit test on the query-string construction once it is extracted into a testable function (currently inlined).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-022
+**Title:** Stale external table reuse in `upload_backend.py`
+**Severity:** Critical
+**Status:** **Fixed** (already resolved on this branch prior to this audit -- not a fix produced by this branch's own work; recorded here for visibility, per the project's request to show what was already true when work started)
+**Date discovered:** 2026-08-19 (this defect existed at the main baseline, c0f2e37)
+**Date resolved:** Prior to this audit (present in dev at commit 296a157, "Fix: BER new column(s) drop" -- exact original fix date not independently determinable from the local clone's reflog)
+
+**Business impact (as it existed at main):** A campaign's backend-report ingestion could silently insert an older Drive file's data whenever the external staging table `{backend_report}_new` already existed from an interrupted prior run.
+
+**Technical explanation (historical, at main):** `insert_new_BER()` used to swallow BigQuery's `Conflict` exception when the staging table already existed, and proceed to insert from whatever that pre-existing table pointed at -- which could be the previous run's Drive file id, not the current one.
+
+**What changed on this branch:** `insert_new_BER()` now explicitly deletes the `{backend_report}_new` table (`bq_client.delete_table(table_ref, not_found_ok=True)`) immediately before creating it, both on the happy path and inside the `except Conflict:` handler, guaranteeing the external table always points at the current run's Drive file.
+
+**Exact file and line evidence:**
+- `projects/automation/upload_backend.py:256-273` (delete-before-create in the happy path, and delete-and-recreate inside `except Conflict:`)
+- Historical comparison: `git diff c0f2e3779c57de37aa48fa48b9edf92e4170b3cb HEAD -- projects/automation/upload_backend.py` shows the `except Conflict: print(...)`-only pattern replaced by explicit delete-then-recreate.
+
+**How to reproduce / verify safely:** Static diff review, as above (no live BigQuery access needed to confirm the code change).
+
+**Recommended correction:** None outstanding -- fixed. Recommend adding a regression test (see below) so this cannot silently regress.
+
+**Tests required:** A characterization test asserting `insert_new_BER` always calls `delete_table` before `create_table`, using `tests/fakes/fake_bigquery.py` -- not yet written; flagged as a good first task for a follow-up branch, since `upload_backend.py` currently constructs its own BigQuery client rather than accepting an injectable one.
+
+**Branch/PR/commit that fixes it:** Present at dev/296a157, inherited by feature/safety-test-baseline.
+
+---
+
+### IH-023
+**Title:** `segments/main.py` `NameError` on undefined `bq_client`
+**Severity:** Medium
+**Status:** **Fixed** (already resolved on this branch prior to this audit)
+**Date discovered:** 2026-08-19 (this defect existed at the main baseline, c0f2e37)
+**Date resolved:** Prior to this audit (present in the uncommitted dev work now committed as 810e30b)
+
+**Business impact (as it existed at main):** `projects/segments/main.py` could not run to completion at all -- it referenced `bq_client` while the line that would have defined it was commented out.
+
+**What changed on this branch:** `main()` now calls `bq_client, drive_service = authenticate_get_clients()` unconditionally at the top of the function.
+
+**Exact file and line evidence:**
+- `projects/segments/main.py:47` -- `bq_client, drive_service = authenticate_get_clients()`
+- Historical: at main baseline, this line was commented out while `bq_client` was still referenced later in the file.
+
+**How to reproduce / verify safely:** Static diff review; `python -m py_compile projects/segments/main.py` (part of this branch's CI static-check step) confirms the file is at least syntactically valid, though a full NameError-style bug is a runtime issue that compilation alone cannot catch.
+
+**Recommended correction:** None outstanding -- fixed.
+
+**Tests required:** None specific (this was a straightforward variable-definition bug, not a logic error worth a dedicated regression test).
+
+**Branch/PR/commit that fixes it:** Present in the uncommitted dev work, committed as 810e30b at the start of this branch's work.
+
+---
+
+### IH-024
+**Title:** `push_to_bq.py` external staging table `Conflict`-swallow
+**Severity:** Medium
+**Status:** **Fixed** (already resolved on this branch prior to this audit)
+**Date discovered:** 2026-08-19 (this defect existed at the main baseline, c0f2e37)
+**Date resolved:** Prior to this audit (present in the uncommitted dev work now committed as 810e30b)
+
+**Business impact (as it existed at main):** The same class of issue as IH-022, but for the per-segment CSV staging tables used during segment publication to BigQuery (`{code}_{country}_{segment}_served`-style tables), rather than the backend-report staging table.
+
+**What changed on this branch:** `create_external_table()` now calls `delete_table(table_name, bq_client)` unconditionally immediately before `bq_client.create_table(table)`, removing any leftover staging table from a previous run before creating a fresh one.
+
+**Exact file and line evidence:**
+- `projects/segments/scripts/push_to_bq.py:107-109` -- `delete_table(table_name, bq_client)` called immediately before `table = bq_client.create_table(table)`
+- Historical: at main baseline, table creation was wrapped in a bare `try/except:` that only printed a message on conflict, without deleting or recreating anything.
+
+**How to reproduce / verify safely:** Static diff review.
+
+**Recommended correction:** None outstanding -- fixed.
+
+**Tests required:** None specific.
+
+**Branch/PR/commit that fixes it:** Present in the uncommitted dev work, committed as 810e30b at the start of this branch's work.
+
+---
+
+## Security and access risks
+
+### IH-025
+**Title:** Flask UI has no authentication or CSRF protection on write routes
+**Severity:** Critical
+**Status:** Open
+**Date discovered:** 2026-08-19 -- worse on this branch than at main: the write-capable route surface has grown.
+
+**Business impact:** Anyone who can reach the UI's network port can trigger production BigQuery writes and Google Drive uploads, including a route that now runs the campaign tracker for every campaign in the system with a single unauthenticated request.
+
+**Technical explanation:** No route in `ui/app.py` has an authentication decorator, a session check, or a CSRF token; no template renders a CSRF field; `Flask-WTF`/`CSRFProtect` is not installed or configured. On the main baseline there were two POST write routes (`/campaign/<code>/run/<action>`, `/automation`). This branch adds three more: `/api/campaign/<code>/run/<action>` (a JSON duplicate of the first), `/api/run-all-trackers` (loops over every campaign and calls the tracker for each, in one request), and `/api/campaigns/add` (currently does not persist -- see IH-041 -- but returns a fabricated success response).
+
+**Exact file and line evidence:**
+- `ui/app.py:119` -- `@app.route('/campaign/<code>/run/<action>', methods=['POST'])`
+- `ui/app.py:154` -- `@app.route('/api/campaign/<code>/run/<action>', methods=['POST'])` (new on this branch)
+- `ui/app.py:187` -- `@app.route('/api/run-all-trackers', methods=['POST'])` (new on this branch) -- loops `for code in campaigns.keys(): ... tracker_main(code)`
+- `ui/app.py:215` -- `@app.route('/api/campaigns/add', methods=['POST'])` (new on this branch)
+- `ui/app.py:284` -- `@app.route('/automation', methods=['POST'])`
+- No occurrence of `csrf` (case-insensitive) anywhere under `ui/` (confirmed via repo-wide search)
+
+**How to reproduce / verify safely:** Static reading of every `@app.route(...)` decorator and the absence of any auth/CSRF mechanism in the file; no live request was sent to any UI instance during this audit.
+
+**Recommended correction:** Add authentication (even a simple shared-secret header would be an improvement) and CSRF protection before this UI is exposed on any network beyond `localhost`; treat `/api/run-all-trackers` as especially high-risk given its blast radius.
+
+**Tests required:** Route-level tests asserting a 401/403 without credentials, once authentication is added (currently there is nothing to test -- every route is open by design/oversight).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-026
+**Title:** Flask app runs with `debug=True` on `host='0.0.0.0'`
+**Severity:** Critical
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; unchanged on this branch)
+
+**Business impact:** If this app is ever run outside a fully isolated local machine, the Werkzeug interactive debugger becomes reachable from the network, which can allow arbitrary code execution by anyone who can reach the port.
+
+**Technical explanation:** `app.run(debug=True, host='0.0.0.0', port=5000)` binds to all network interfaces with the debugger enabled.
+
+**Exact file and line evidence:**
+- `ui/app.py:401` -- `app.run(debug=True, host='0.0.0.0', port=5000)`
+
+**How to reproduce / verify safely:** Static reading; not run during this audit (running the UI at all is out of the safety boundary for this branch).
+
+**Recommended correction:** `debug=False` outside local development, bind to `127.0.0.1` unless a reverse proxy with its own auth sits in front.
+
+**Tests required:** None (a configuration issue, not a logic defect).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-027
+**Title:** Hardcoded Flask `secret_key` committed in source
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; unchanged on this branch)
+
+**Business impact:** Anyone with read access to this repository can forge session cookies and flash-message state for the UI.
+
+**Technical explanation:** The Flask session-signing key is a literal string in source rather than an environment variable or secret.
+
+**Exact file and line evidence:**
+- `ui/app.py:26` -- `app.secret_key = 'info-harbor-secret-key-2024'`
+
+**How to reproduce / verify safely:** Static reading.
+
+**Recommended correction:** Load from an environment variable or Secret Manager; rotate the key once moved.
+
+**Tests required:** None.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-028
+**Title:** `delete_from_drive.py` ships with `DELETE_MODE = True` by default
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 -- present at main under a different folder id; the file was substantially rewritten on this branch (622 lines changed) but the armed-by-default pattern was carried forward unchanged.
+
+**Business impact:** Running this script with no arguments permanently deletes files from a hardcoded Google Drive folder, with no confirmation prompt and no dry-run default.
+
+**Technical explanation:** The module-level constants `DELETE_MODE` and the target folder id are hardcoded, and `DELETE_MODE` defaults to `True` (destructive), not `False` (dry run).
+
+**Exact file and line evidence:**
+- `projects/segments/scripts/delete_from_drive.py:31` -- `FOLDER_ID_TO_DELETE = "1tTawCZ4ihAfDeKp1Xac9QiDIBICfmMuM"` (a different folder id than at the main baseline, confirming this file was reworked, not merely reformatted)
+- `projects/segments/scripts/delete_from_drive.py:34` -- `DELETE_MODE = True`
+- `projects/segments/scripts/delete_from_drive.py:38` -- `DELETE_ALL_FILES = False`
+
+**How to reproduce / verify safely:** Static reading of the module-level constants; this script was never executed during this audit (explicitly listed as a "do not run" boundary in AGENTS.md/CLAUDE.md).
+
+**Recommended correction:** Default `DELETE_MODE` to `False`; require an explicit `--yes`/`--confirm` CLI flag to actually delete; take the folder id as a required argument rather than a hardcoded constant.
+
+**Tests required:** None offline (this is a deliberately dangerous script whose safe behavior is "does nothing without explicit confirmation" -- worth a unit test on the argument-parsing/guard logic once refactored to accept flags).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-029
+**Title:** Inconsistent credential model (key files vs. Secret Manager)
+**Severity:** Medium
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; pattern unchanged on this branch)
+
+**Business impact:** Two different trust models coexist for the same system: the deployed Cloud Function fetches credentials from Secret Manager at runtime, while the UI, the segments scripts, and several standalone tools read long-lived service-account JSON key files from a local `keys/` directory. The key-file path is a weaker, harder-to-rotate model that this modernization should converge away from.
+
+**Technical explanation:** `shared/config/campaigns/database_loader.py` (used by the Flask UI on every page load) and most of `projects/segments/scripts/` read `service_account.Credentials.from_service_account_file(...)` against files under `keys/`, while `projects/automation/main.py` and `custom_codename.py` fetch secrets from Secret Manager (`secretmanager.SecretManagerServiceClient`).
+
+**Exact file and line evidence:**
+- `shared/config/campaigns/database_loader.py:21-25` (key-file path, used by the UI's `get_live_campaigns()`)
+- `projects/automation/main.py:14-17, 110-118` (Secret Manager path)
+- `keys/` exists locally on this machine (confirmed by directory listing -- names only, contents never read) and is git-ignored (`.gitignore:39` -- `keys/`), so it is not committed, but its existence is required for the key-file code paths to function at all.
+
+**How to reproduce / verify safely:** Static reading of both code paths; the local `keys/` directory's file names were listed to confirm it is untracked and gitignored, but no file contents were opened.
+
+**Recommended correction:** Converge on Secret Manager (or another centrally-rotatable secret store) for every code path, including the UI and segments scripts.
+
+**Tests required:** None offline; this is an architecture decision, not a bug with a unit-testable fix.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-030
+**Title:** Unparameterized SQL and Drive query-string interpolation throughout
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; pattern present throughout both baseline and branch code)
+
+**Business impact:** No query anywhere in this codebase uses parameterized SQL; every value (including some that could originate from user-editable metadata like campaign names) is interpolated directly into a SQL or Drive-API query string. A campaign name containing an apostrophe breaks the query outright today; a more deliberately crafted value could inject additional SQL or Drive query clauses.
+
+**Technical explanation:** `bigquery.ScalarQueryParameter` (BigQuery's parameterized-query mechanism) does not appear anywhere in the repository. Every `INSERT`/`UPDATE`/`SELECT` is built via f-strings or `.replace()` substitution.
+
+**Exact file and line evidence:**
+- `projects/campaign-tracker/main.py:39-68` -- campaign name and dates interpolated directly into an `INSERT`
+- `projects/segments/scripts/query_orchestrator.py:197-204` -- POI filter values interpolated into a quoted SQL `IN (...)` list
+- `projects/automation/upload_backend.py:89, 98` -- Drive `q=` search strings built via f-string interpolation of `folder_name`/`file_prefix`
+- `projects/segments/scripts/transfer_to_drive.py:56-57` -- Drive folder-search query built the same way
+- `projects/segments/scripts/delete_from_drive.py` (multiple sites, feeding a delete path -- see IH-028)
+
+**How to reproduce / verify safely:** Static reading; no injection attempt was made against any live service.
+
+**Recommended correction:** Move every BigQuery call to parameterized queries; for Drive query strings, at minimum escape single quotes in interpolated values.
+
+**Tests required:** A unit test asserting a campaign name containing an apostrophe is safely escaped, once query construction is centralized enough to test in isolation.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+## Data-correctness and idempotency risks
+
+*IH-007, IH-008, IH-009, IH-011, IH-012, and IH-020 above are also data-correctness/idempotency findings; they are filed under "Confirmed defects" because each is tied to a specific, narrow code defect. The two findings below are filed separately because they describe an idempotency property of the pipeline's write pattern as a whole, not a single line-level bug.*
+
+### IH-031
+**Title:** `{codename}_visitors` uses `WRITE_APPEND` with an overlapping window
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; file unchanged on this branch)
+
+**Business impact:** Every query except `visitors` truncates and rewrites its destination table on each run, but `visitors` appends -- and because `get_run_dates` deliberately re-queries a window that overlaps the previous run's (`start_date_q = last_update - 9 days`), consecutive runs duplicate rows in this table on the normal, successful path, not just on error-triggered reruns.
+
+**Technical explanation:** `run_pipeline_queries` sets `WRITE_TRUNCATE` for every query except `"visitors"`, which uses `WRITE_APPEND`. Combined with the 9-day look-back built into `get_run_dates` (see IH-018/IH-019), each successful run re-fetches and re-appends several days already covered by the previous run.
+
+**Exact file and line evidence:**
+- `projects/automation/query_orchestrator.py:329-332` -- sets `WRITE_TRUNCATE` for every query except `visitors`, which gets `WRITE_APPEND`
+- `projects/automation/query_orchestrator.py:353` -- `start_date_q = last_update - timedelta(days=9)`
+
+**How to reproduce / verify safely:** Static reading of the write-disposition logic and the date-window construction together; live reproduction requires two real BigQuery runs, out of scope offline. `tests/unit/test_get_run_dates.py` independently confirms the window is deliberately backdated relative to `last_update` on every call.
+
+**Recommended correction:** Either dedupe on load (with a real row identity, not `SELECT DISTINCT *` -- see IH-020), or switch to a `MERGE`/upsert pattern keyed on a natural row identity.
+
+**Tests required:** A parity test comparing row counts in `{codename}_visitors` before and after a rerun, using the parity manifest helpers in `tests/parity/manifest.py` (needs a fake/sandboxed BigQuery table to be meaningful; flagged for a future integration-test tier).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-032
+**Title:** Combined `{code_name}_Segments` table appended without dedupe on rerun
+**Severity:** Medium
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; pattern unchanged on this branch, even though the external staging table creation around it was fixed -- see IH-024)
+
+**Business impact:** While IH-024 fixed the staging-table-conflict problem, the final `INSERT INTO {code_name}_Segments` step that follows it is still a plain append with no dedupe, so rerunning `push_to_bq.py`'s combined-table step for the same campaign duplicates every DID/segment/country/controlled row already inserted.
+
+**Technical explanation:** `insert_to_combined()` always executes a plain `INSERT INTO ... SELECT ...` against the combined table; nothing truncates or dedupes it between runs, unlike the external staging table it reads from (which IH-024 now deletes-and-recreates each time).
+
+**Exact file and line evidence:**
+- `projects/segments/scripts/push_to_bq.py:54-87` (`insert_to_combined`, plain `Insert INTO` with no `WRITE_TRUNCATE`-equivalent or existence check on the combined table)
+- `projects/segments/scripts/push_to_bq.py:35-51` (`create_Combined_table`, only creates the table once via a bare `except:` if it already exists -- it is never truncated on rerun)
+
+**How to reproduce / verify safely:** Static reading; live reproduction requires a real BigQuery table, out of scope offline.
+
+**Recommended correction:** Truncate the combined table before each full rerun of a campaign's segment publication, or key inserts so reruns are naturally idempotent (e.g. delete existing rows for that DID/segment/country combination before inserting).
+
+**Tests required:** A parity test on row counts before/after a rerun, same caveat as IH-031 (needs a fake or sandboxed BigQuery table).
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+## Performance issues
+
+### IH-033
+**Title:** O(lines) redundant Drive upload calls in the old `transfer_to_drive.py`
+**Severity:** Low
+**Status:** **Fixed** (already resolved on this branch prior to this audit)
+**Date discovered:** 2026-08-19 (this defect existed at the main baseline, c0f2e37)
+**Date resolved:** Prior to this audit (present in the uncommitted dev work now committed as 810e30b)
+
+**Business impact (as it existed at main):** The old upload loop called `file.SetContentFile(file_path)` once per line of every uploaded CSV, inside a loop whose body was otherwise a no-op (the actual upload happened once, after the loop, via `file.Upload()`) -- pure wasted CPU proportional to file size, worsening with campaign scale.
+
+**What changed on this branch:** `transfer_to_drive.py` was rewritten to use `googleapiclient`'s `MediaFileUpload`, with resumable, chunked upload for files over 5 MB and simple single-shot upload otherwise -- no per-line work at all. This also removed the file's dependency on `pydrive2`/`oauth2client` in favor of the same Google API client library used elsewhere in the repo, and added explicit handling for Drive storage-quota-exceeded errors (returning partial progress instead of crashing).
+
+**Exact file and line evidence:**
+- `projects/segments/scripts/transfer_to_drive.py:107-203` (the rewritten `transfer()` function; contrast with the historical version's per-line `SetContentFile` loop, visible via `git show c0f2e3779c57de37aa48fa48b9edf92e4170b3cb:projects/segments/scripts/transfer_to_drive.py`)
+
+**How to reproduce / verify safely:** Static diff review.
+
+**Recommended correction:** None outstanding for the performance issue itself. Note that IH-011 (duplicate uploads on rerun) is a separate, still-open defect in this same file.
+
+**Tests required:** None specific to the performance fix.
+
+**Branch/PR/commit that fixes it:** Present in the uncommitted dev work, committed as 810e30b at the start of this branch's work.
+
+---
+
+## Deployment and operational risks
+
+### IH-034
+**Title:** CI deploys to production on every push to `main`, no tests, no gate
+**Severity:** High
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; `.github/workflows/deploy.yml` byte-for-byte unchanged on this branch)
+
+**Business impact:** Any push to `main` -- with no test run, no required review, no approval gate -- immediately redeploys the production Cloud Function using a long-lived service-account key.
+
+**Technical explanation:** The workflow triggers on `push: branches: [main]`, has exactly three steps (checkout, auth, deploy), and none of them run a test suite. This branch adds a separate, non-deploying PR-validation workflow (`.github/workflows/pr-validation.yml`) alongside the existing one, per the explicit instruction not to remove or modify `deploy.yml` in this branch.
+
+**Exact file and line evidence:**
+- `.github/workflows/deploy.yml:3-6` -- `on: push: branches: [main]`
+- `.github/workflows/deploy.yml:12-34` -- checkout, gcloud auth via `secrets.GCP_SA_KEY`, then `gcloud functions deploy` with no preceding test step
+
+**Why this should be replaced (not done in this branch):** A safe sequence would be: (1) require `pr-validation.yml`'s offline suite to pass before a PR can merge to `main` (branch protection, a repository setting, not a code change); (2) gate the deploy job on that same test job within one workflow, or make `deploy.yml` a `workflow_run` triggered only after `pr-validation.yml` succeeds; (3) move off a long-lived `GCP_SA_KEY` secret toward Workload Identity Federation. None of this is done here -- it requires GitHub repository settings and Google Cloud IAM changes, both explicitly out of this branch's safety boundary (no deploy, no GCP access, no production writes).
+
+**How to reproduce / verify safely:** Static reading of `deploy.yml`; the new `pr-validation.yml` was verified to run correctly (see Validation section of `docs/modernization-log.md`) without ever calling `gcloud` or authenticating to GCP.
+
+**Recommended correction:** See "Why this should be replaced" above.
+
+**Tests required:** None (a CI/process change, not a code defect).
+
+**Branch/PR/commit that fixes it:** Not yet fixed; `pr-validation.yml` (this branch) is a prerequisite step, not the fix itself.
+**Date resolved:** N/A
+
+---
+
+### IH-035
+**Title:** `pandas` imported by `data_validation.py` but undeclared in deployed requirements
+**Severity:** Low
+**Status:** Open
+**Date discovered:** 2026-08-19 (identical on main; both files unchanged on this branch)
+
+**Business impact:** `data_validation.py` sits inside `projects/automation/` (the directory Cloud Functions deploys from) but is not imported by `main.py`, so the deployed function does not currently break -- but the moment anyone imports it from a reachable code path, the deploy will fail at runtime with `ModuleNotFoundError: No module named 'pandas'`.
+
+**Technical explanation:** `projects/automation/requirements.txt` (the file Cloud Functions actually installs from, per `--source projects/automation` in `deploy.yml`) does not list `pandas`, while `data_validation.py` imports it.
+
+**Exact file and line evidence:**
+- `projects/automation/data_validation.py:23` -- `import pandas as pd`
+- `projects/automation/requirements.txt` -- 10 pins, no `pandas` entry (confirmed by listing the file's contents)
+- Root `requirements.txt` (not what gets deployed) does include `pandas==2.1.1`
+
+**How to reproduce / verify safely:** Static comparison of the import statement against the deployed requirements file's contents; no deploy was performed to confirm the runtime failure.
+
+**Recommended correction:** Add `pandas` (and confirm every other undeclared-but-imported package) to `projects/automation/requirements.txt`, or remove `data_validation.py` from the deployed source directory if it is not meant to run in that environment.
+
+**Tests required:** A CI check (candidate for `pr-validation.yml`, not added in this branch) that diffs imports actually used under `projects/automation/` against `projects/automation/requirements.txt`.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-036
+**Title:** `projects/poi/` added with no tests, no CI wiring, no prior documentation
+**Severity:** Medium
+**Status:** Needs Validation
+**Date discovered:** 2026-08-19 -- entirely new on this branch relative to the main baseline (commit `8981f83`, "Add: POI source code")
+
+**Business impact:** A new standalone data-write module (POI = points of interest) exists in the repository with its own BigQuery write logic, but it is not exercised by any test, not deployed by CI, and not referenced by any other part of the system -- its correctness and intended usage are currently unverified by this audit.
+
+**Technical explanation:** `projects/poi/main.py` defines its own `create_client`, `get_country_id`, `get_city_id`, `table_exists`, `create_poi_table`, `get_max_poi_id`, `insert_pois`, and `process_pois` functions, following the same `from variables import *` / `from input import *` pattern as the rest of the legacy code. A repository-wide search confirms nothing outside `projects/poi/` itself imports or references it, and `.github/workflows/deploy.yml` only deploys `projects/automation`.
+
+**Exact file and line evidence:**
+- `projects/poi/main.py:1-222` (full file, self-contained)
+- `projects/poi/input.py`, `projects/poi/variables.py` (its own config, not shared with other projects)
+- Confirmed via `grep -rn "projects.poi\|projects/poi\|from poi\|import poi"` across all tracked `.py` files: no hits outside `projects/poi/` itself
+
+**How to reproduce / verify safely:** Static reading and a repository-wide grep, both performed; the module's actual BigQuery write correctness was not evaluated in depth (that would require either live credentials or a much deeper read than this audit pass covered), which is why this is filed as Needs Validation rather than a confirmed defect list.
+
+**Recommended correction:** Document its intended purpose and invocation method in `docs/modernization-spec.md` (done, see that file's scope notes); decide whether it should be wired into CI/tests or remains an intentionally standalone manual tool; add at least a smoke-import test.
+
+**Tests required:** None added yet; recommended as a follow-up task, not blocking this branch's stated scope (test foundation, not full coverage).
+
+**Branch/PR/commit that fixes it:** N/A (this is a scope/documentation gap, not a bug to "fix").
+**Date resolved:** N/A
+
+---
+
+## Missing tests and documentation
+
+### IH-037
+**Title:** No test suite existed; `.gitignore`'s `test*` pattern actively blocked one
+**Severity:** Critical
+**Status:** **Fixed** (by this branch)
+**Date discovered:** 2026-08-19
+**Date resolved:** 2026-08-19
+
+**Business impact (before this branch):** The repository had zero tests, zero test configuration, and -- worse than merely absent -- an active `.gitignore` rule that would have silently discarded any `tests/` directory or `test_*.py` file a future contributor tried to commit, making the omission self-perpetuating.
+
+**Technical explanation:** `.gitignore` contained a bare `test*` pattern with no exceptions, matching any path starting with `test` at any depth, including a `tests/` directory.
+
+**Exact file and line evidence (before the fix, at main/dev prior to this branch):**
+- `.gitignore:45` -- `test*` (the sole content of that section)
+
+**What changed on this branch:**
+- `.gitignore`'s `test*` line replaced with narrow, non-blocking patterns for test artifacts only (`.pytest_cache/`, `.coverage`, `htmlcov/`, `tests-output/`) plus a `.venv/` entry for this branch's local test tooling virtualenv -- `tests/` and every `test_*.py` are now tracked normally.
+- Added `tests/` with `conftest.py`, `unit/`, `fakes/`, `fixtures/`, `parity/` (50 tests total, all passing offline).
+- Added `pytest.ini` and `requirements-dev.txt`.
+
+**How to reproduce / verify safely:**
+```
+git check-ignore -v tests/conftest.py
+```
+now exits 1 (not ignored); before the fix it matched `test*` and exited 0 (ignored). Also verified in `pr-validation.yml`'s static-checks job.
+
+**Recommended correction:** None outstanding.
+
+**Tests required:** N/A (this finding is about test infrastructure itself).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-19
+
+---
+
+### IH-038
+**Title:** `projects/poi/` was undocumented prior to this branch
+**Severity:** Low
+**Status:** **Fixed** (by this branch, documentation only)
+**Date discovered:** 2026-08-19
+**Date resolved:** 2026-08-19
+
+**Business impact:** A new module with its own BigQuery write path existed with no mention in any spec or README, making it invisible to anyone reviewing the system's overall shape.
+
+**What changed on this branch:** `docs/modernization-spec.md` now includes `projects/poi/` in its current-state workflow description and explicitly notes its undetermined integration status (cross-referenced to IH-036).
+
+**Exact file and line evidence:** See `docs/modernization-spec.md`, "Current three-stage workflow" section (now four-stage, poi noted as a standalone addition).
+
+**Recommended correction:** None outstanding for documentation; IH-036's code-level questions remain open.
+
+**Tests required:** N/A.
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-19
+
+---
+
+## Suspected issues requiring validation
+
+*These are plausible but not confirmed by this audit. They are listed separately, per instruction, so they are never mistaken for confirmed defects.*
+
+### IH-039
+**Title:** `aaa` file may indicate repository/production drift
+**Severity:** Medium
+**Status:** Needs Validation
+**Date discovered:** 2026-08-19
+
+**What is known:** A file named `aaa` sits at the repository root containing four lines of captured stdout: two `Starting queries for 123:` lines and two Python dict reprs with keys `'Executed Queries'` and `'Skipped Queries'`. Those exact key strings do not appear anywhere in this repository's current source (confirmed via repository-wide search).
+
+**What is NOT established:** Whether this reflects a genuinely different, currently-deployed version of the orchestrator, or is simply a stray local log from an experiment, an abandoned branch, or a colleague's machine. Per explicit correction to this audit's framing: this file is a possible drift indicator, not proof of drift.
+
+**How to validate safely:** Compare the deployed Cloud Function's source (via `gcloud functions describe`/`gcloud functions logs`, read-only, by someone with appropriate GCP access -- out of scope for this offline audit) against the commit history of this repository, to determine whether the deployed code matches any commit here. If it does, this file is almost certainly stray local output and can simply be deleted. If it does not, the parity/compatibility work in `docs/modernization-spec.md` needs to account for a real gap between this repository and production.
+
+**Recommended correction:** No code change; a validation task for whoever has GCP read access, tracked here until resolved.
+
+**Branch/PR/commit that fixes it:** N/A.
+**Date resolved:** N/A
+
+---
+
+### IH-040
+**Title:** Unexplained `keys/test-google-sheet.json` credential file
+**Severity:** Low
+**Status:** Needs Validation
+**Date discovered:** 2026-08-19
+
+**What is known:** The local (gitignored, untracked) `keys/` directory contains three files: `maddictdata-bq.json`, `maddictdata-google-sheets.json`, and `test-google-sheet.json`. Only the file names were listed; no file contents were opened or read as part of this audit, per the safety boundary against handling real credentials.
+
+**What is NOT established:** What `test-google-sheet.json` is for, whether it represents a real (if lower-privilege) service account, whether any code path references it, and whether it should exist at all.
+
+**How to validate safely:** Whoever manages this machine's `keys/` directory should confirm the purpose of that file and, if it is unused, remove it, without ever pasting its contents into any AI tool or issue tracker.
+
+**Recommended correction:** None from this audit; a local hygiene question outside the repository itself (the file is not tracked by git).
+
+**Branch/PR/commit that fixes it:** N/A.
+**Date resolved:** N/A
+
+---
+
+### IH-041
+**Title:** `/api/campaigns/add` reports success without persisting anything
+**Severity:** Low
+**Status:** Needs Validation
+**Date discovered:** 2026-08-19 -- new route on this branch
+
+**What is known:** `api_add_campaign()` validates the submitted campaign data via `CampaignConfig.validate()` and returns a JSON success response describing the "added" campaign, but the code contains an explicit `# TODO: Implement actual database save` comment and never writes anywhere.
+
+**Exact file and line evidence:**
+- `ui/app.py:263-265` -- the `# TODO: Implement actual database save` comment, immediately followed by a `return jsonify({'success': True, ...})`
+
+**What is NOT fully established:** Whether this is a known, intentional stub (e.g. UI development ahead of backend work) or a genuinely misleading response that could confuse an operator into believing a campaign was created. Filed as Needs Validation rather than a confirmed defect because the code's own comment suggests this is understood, in-progress work, not an oversight -- but it is still worth surfacing since the HTTP response gives no indication that nothing was saved.
+
+**Recommended correction:** Either implement the persistence, or change the response to make the stub status explicit (e.g. `"success": false, "error": "not yet implemented"`) until it does.
+
+**Tests required:** A test asserting the route's response accurately reflects whether persistence occurred, once implemented.
+
+**Branch/PR/commit that fixes it:** Not yet fixed.
+**Date resolved:** N/A
+
+---
+
+### IH-042
+**Title:** `.gitignore` fix revealed a previously-hidden, untracked, live-credential test script
+**Severity:** Medium
+**Status:** Needs Validation
+**Date discovered:** 2026-08-19 -- discovered as a direct side effect of fixing IH-037
+
+**What is known:** After narrowing `.gitignore`'s `test*` pattern (IH-037),
+`git status` revealed a file that was previously silently excluded:
+`projects/automation/test_backend_upload.py` (161 lines, untracked). It is a
+manual smoke-test script for `upload_backend.py` that authenticates directly
+with real BigQuery and Secret Manager credentials -- it is not part of the
+offline suite added by this branch, and it was never run as part of this
+audit. This is concrete evidence of what the old `test*` pattern was
+actually hiding, beyond the abstract risk described in IH-037.
+
+**What is NOT established:** Whether this script is still needed, whether
+it should be committed (under a name/location that doesn't collide with the
+new `tests/` convention), or whether it should be deleted. It touches
+production credentials, so it is left completely untouched by this branch.
+
+**Exact file and line evidence:**
+- `projects/automation/test_backend_upload.py` (entire file, untracked;
+  confirmed via `git status --porcelain` after the `.gitignore` fix)
+
+**How to validate safely:** A human with knowledge of this script's history
+should decide whether to commit it (e.g. renamed to avoid the `tests/`
+convention, such as `scripts/manual_smoke_test_backend_upload.py`), delete
+it, or leave it untracked deliberately. Do not run it -- it requires real
+production credentials.
+
+**Recommended correction:** None from this audit; a human decision, not a
+code fix.
+
+**Branch/PR/commit that fixes it:** N/A.
+**Date resolved:** N/A

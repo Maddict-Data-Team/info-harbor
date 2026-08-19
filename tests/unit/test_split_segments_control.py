@@ -1,0 +1,143 @@
+"""
+Characterization tests for projects/segments/scripts/split_segments.py.
+
+Covers:
+  - Deterministic control sampling via a SEEDED random module state,
+    injected only from the test process (production code and its call to
+    the unseeded, module-level `random` is never modified).
+  - IH-007 (Critical, NEW on this branch): Write_output_to_files excludes
+    control-group DIDs from served output by comparing a RAW file line
+    (with trailing newline) against a set of STRIPPED DIDs, so the
+    exclusion check never matches and served/control end up overlapping.
+  - IH-008 (Critical, NEW on this branch): read_data_folder unconditionally
+    calls random.sample(population, k=100_000), which raises ValueError
+    for any segment file with fewer than 100,000 raw DID lines.
+
+These tests build the exact relative directory layout the module hardcodes
+("projects/segments/data/{raw,served,controlled}") under a tmp_path via
+the isolated_segments_workspace fixture, and call the REAL functions --
+no network, no credentials, no modification to split_segments.py.
+"""
+from __future__ import annotations
+
+import random
+
+from tests.conftest import import_module_from_path
+
+
+def _load(repo_root):
+    """Load the real split_segments.py the same way projects/segments/
+    main.py does: its own directory (scripts/) at the front of sys.path
+    for `from variables import *`, and its internal sys.path.append for
+    `from input import *` (parent, projects/segments/)."""
+    path = repo_root / "projects" / "segments" / "scripts" / "split_segments.py"
+    return import_module_from_path("split_segments_under_test", path)
+
+
+def _write_raw_csv(base, filename: str, dids: list[str]):
+    raw_dir = base / "projects" / "segments" / "data" / "raw"
+    with open(raw_dir / filename, "w", newline="\n") as f:
+        f.write("DID\n")
+        for d in dids:
+            f.write(d + "\n")
+
+
+class TestControlSamplingDeterminismUnderAnInjectedSeed:
+    """get_control() calls the module-level `random.sample` with no seed
+    anywhere in production. To make it reproducible IN TESTS ONLY, these
+    tests seed Python's shared `random` module before calling the real,
+    unmodified get_control(). pytest/CPython resets nothing globally after
+    the test, but this is process-local to the test run and never touches
+    split_segments.py or any other production file.
+    """
+
+    def test_same_seed_yields_the_same_control_set(self, repo_root, isolated_segments_workspace, monkeypatch):
+        mod = _load(repo_root)
+        monkeypatch.setattr(mod, "controlled_size", 5, raising=False)
+        population = [f"did-{i:04d}" for i in range(50)]
+
+        random.seed(20260317)
+        first = mod.get_control(population)
+        random.seed(20260317)
+        second = mod.get_control(population)
+
+        assert first == second
+        assert len(first) == 5
+
+    def test_different_seeds_can_yield_different_control_sets(self, repo_root, isolated_segments_workspace, monkeypatch):
+        mod = _load(repo_root)
+        monkeypatch.setattr(mod, "controlled_size", 5, raising=False)
+        population = [f"did-{i:04d}" for i in range(50)]
+
+        random.seed(1)
+        a = mod.get_control(population)
+        random.seed(2)
+        b = mod.get_control(population)
+
+        assert a != b, "extremely unlikely to collide with 5-of-50 sampling under different seeds"
+
+
+class TestServedControlOverlapBug:
+    """# BUG: IH-007 -- served output should NEVER contain a DID that was
+    also placed in the control group; that disjointness is the entire
+    point of a control group. This test proves it currently does not
+    hold, using the real Write_output_to_files().
+    """
+
+    def test_control_dids_leak_into_served_output(self, repo_root, isolated_segments_workspace):
+        mod = _load(repo_root)
+        base = isolated_segments_workspace
+
+        dids = [f"did-{i:03d}" for i in range(20)]
+        _write_raw_csv(base, "183_UAE_CarOwners_20260317.csv", dids)
+
+        # A control set drawn from (a subset of) the same DIDs, exactly as
+        # get_control() would return: a set of STRIPPED strings.
+        control = {"did-000", "did-005", "did-010"}
+        names = ["183_UAE_CarOwners_20260317"]
+
+        mod.Write_output_to_files(control, names, "UAE")
+
+        served_path = base / "projects" / "segments" / "data" / "served" / "183_UAE_CarOwners_20260317_served.csv"
+        served_dids = set(served_path.read_text().splitlines()[1:])  # drop header
+
+        overlap = control & served_dids
+        assert overlap, (
+            "Expected the newline/whitespace mismatch bug (IH-007) to leak "
+            "control DIDs into served output. If this assertion now fails, "
+            "the bug has been fixed -- update docs/code-audit.md IH-007 to "
+            "Fixed and rewrite this test to assert disjointness instead."
+        )
+
+    def test_diagnosis_raw_line_never_equals_a_stripped_set_member(self):
+        """Isolates the exact mechanism: `did` from `for did in inpf:` is a
+        raw file line (trailing newline included); `control` holds
+        stripped strings. `"x\n" in {"x"}` is always False."""
+        control = {"did-000"}
+        raw_line = "did-000\n"
+        assert raw_line not in control
+        assert raw_line.strip() in control
+
+
+class TestControlPoolSubsamplingCrash:
+    """# BUG: IH-008 -- read_data_folder() calls
+    random.sample([...], k=100_000) unconditionally. Any segment file with
+    fewer than 100,000 raw DID lines crashes the whole split_files() run.
+    """
+
+    def test_small_segment_file_raises_value_error(self, repo_root, isolated_segments_workspace):
+        mod = _load(repo_root)
+        base = isolated_segments_workspace
+        # Deliberately far fewer than 100,000 lines -- realistic for a
+        # small custom segment.
+        _write_raw_csv(base, "183_UAE_SmallSegment_20260317.csv", [f"did-{i}" for i in range(50)])
+        monkeypatch_excluded = getattr(mod, "excluded_segments", [])
+        mod.excluded_segments = []
+
+        try:
+            import pytest
+
+            with pytest.raises(ValueError):
+                mod.read_data_folder("UAE")
+        finally:
+            mod.excluded_segments = monkeypatch_excluded

@@ -1,0 +1,4 @@
+# Offline test/dev tooling only. Never installed in the deployed Cloud
+# Function (projects/automation/requirements.txt is separate and
+# unaffected by this file). See AGENTS.md / docs/modernization-spec.md.
+pytest==9.1.1
