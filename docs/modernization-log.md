@@ -146,6 +146,40 @@ and is neither called by the fix nor by the test.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-013 fixed
+
+**Finding fixed:**
+- **IH-013** (Medium) -- `projects/segments/queries.ini`'s `query_HG`
+  declared its source table as alias `HG` but its join predicate
+  referenced `ls.Longitude`/`ls.latitude` -- an alias never bound in this
+  query (leftover from `query_POI`, a different query earlier in the same
+  file). Any campaign using the HG segment type would fail with a live SQL
+  error every time. Fixed: `ls.Longitude,ls.latitude` ->
+  `HG.Longitude,HG.latitude`.
+
+**Scope note:** this is a `queries.ini` edit, which `docs/modernization-spec.md`
+§4 lists under this branch's non-goals. Made under the same explicit
+authorization already covering the pipeline-logic-change deviation
+(2026-08-20 IH-007/IH-008 entry) -- single correct answer, turns an
+always-failing query into a working one, no silent-output-change risk
+(the query previously hard-errored on every use, never returned wrong
+data).
+
+**Files changed:** `projects/segments/queries.ini` (1 line),
+`tests/unit/test_segments_queries_ini.py` (new, 1 test), `docs/code-audit.md`.
+
+**Tests:** focused (1) and full suite passing:
+```
+python -m pytest -q
+# 61 passed
+```
+
+**Parity implications:** None measurable offline; the query previously
+could not run at all (SQL error), so there is no prior "output" to
+compare against. Not exercised by any live BigQuery call in this branch.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed
