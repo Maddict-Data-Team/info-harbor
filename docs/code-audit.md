@@ -73,6 +73,7 @@ validation" instead, however plausible it looks.
 | [IH-040](#ih-040) | Unexplained `keys/test-google-sheet.json` credential file | Low | Needs Validation |
 | [IH-041](#ih-041) | `/api/campaigns/add` reports success without persisting anything | Low | **Fixed** |
 | [IH-042](#ih-042) | `.gitignore` fix revealed a previously-hidden, untracked, live-credential test script | Medium | Needs Validation |
+| [IH-044](#ih-044) | `navigate_and_search_file`'s `month_name` default evaluated once at import, not per call | High | **Fixed** |
 
 ---
 
@@ -400,6 +401,8 @@ Calls the real `get_raw_segments()` twice in a row against a monkeypatched `quer
 
 **Tests required:** `tests/unit/test_get_segments_raw_rerun.py` (new, 1 test) -- the "mocking the BigQuery row iterator" this was deferred pending turned out to be a straightforward `monkeypatch.setattr` on `query_orchestrator.run_query_behavior`, not requiring a follow-up branch after all.
 
+**Residual gap noted by automated review (2026-08-20), not a regression to re-open this finding over:** `'w'` mode truncates the file at open time, before any row is fetched -- if the BigQuery row iterator raises partway through (network hiccup, quota error), the file is left truncated/incomplete rather than duplicated-but-complete as before the fix. `get_segments_raw.py`'s own `if __name__ == "__main__":` entry point also calls `get_raw_segments` with no preceding `reset_folders()` call, so a stale prior file can be silently replaced by a truncated one on a later crash. Trades one failure mode (duplicate rows on rerun, now fixed) for a narrower one (silent truncation on mid-fetch failure, pre-existing, not introduced by this fix); true atomicity would need a temp-file-then-rename pattern, worth a follow-up finding rather than reopening this one.
+
 **Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
 **Date resolved:** 2026-08-20
 
@@ -471,6 +474,8 @@ Calls the real `get_raw_segments()` twice in a row against a monkeypatched `quer
 **How to reproduce / verify safely:** Static reading; reproducing the race requires a real BigQuery table under concurrent load, out of scope offline.
 
 **Fix applied (partial):** `projects/campaign-tracker/main.py:70-73`: `client.query(query)` -> `client.query(query).result()`. A failed `INSERT` now raises instead of being silently fired-and-forgotten -- `metadata_placelift()` has no surrounding `try/except`, so the exception propagates to the caller. **Not fixed:** the `id`-assignment race itself (`COALESCE(MAX(id), 0) + 1 + {index}`, recomputed independently per country) -- moving to a single multi-row `INSERT` or a surrogate key generator is a genuine design choice between two different mechanisms, not a single-answer bug fix, and is added to the decision queue.
+
+**Side effect noted by automated review (2026-08-20), not a regression to re-open this finding over:** adding `.result()` makes the per-country loop strictly sequential (each `MAX(id)` subquery now sees the previous country's already-committed row), so the unchanged `+ index` offset now produces growing id gaps instead of the original collision risk -- harmless if `id` is purely a surrogate key. More importantly, a failure partway through the loop now stops it immediately (via the newly-added `.result()`), leaving earlier countries' rows committed and later countries never attempted, with no record of which countries succeeded -- a sharper, now-visible version of the same underlying gap this finding already flags as unfixed. Reinforces (doesn't change) the decision-queue recommendation: a single multi-row `INSERT` resolves both the original id race and this new partial-completion risk at once.
 
 **Recommended correction:** ~~Call `.result()` on the query job~~ Done. ~~Move to a single multi-row `INSERT ... VALUES`... or use a proper surrogate key generator~~ not implemented -- design decision, see decision queue.
 
@@ -846,6 +851,8 @@ Two tests: the extracted `_file_name_starts_with_prefix` helper directly (`"2100
 
 **Recommended correction:** Add authentication (even a simple shared-secret header would be an improvement) and CSRF protection before this UI is exposed on any network beyond `localhost`; treat `/api/run-all-trackers` as especially high-risk given its blast radius.
 
+**Severity update (2026-08-20), by automated security review of this session's IH-014 fix -- still Open, not fixed, priority raised:** the `/api/run-all-trackers` blast radius described above was written while `from projects.campaign_tracker.main_new import main` was still broken (IH-014, then Open) -- every call to this route was already failing with `ModuleNotFoundError` before it could touch BigQuery, so the risk was real-but-latent. IH-014 is now Fixed (this session, `feature/safety-test-baseline`): `tracker_main = get_campaign_tracker_main_new()` (`shared/utils/compatibility.py`) makes the import succeed, so `/campaign/<code>/run/tracker`, `/api/campaign/<code>/run/tracker`, and `/api/run-all-trackers` now actually execute `metadata_placelift()` -> a real BigQuery `INSERT` per campaign per country on an unauthenticated request, with `/api/run-all-trackers` doing this for the entire campaign registry in one call. The gap between "documented risk" and "live, exploitable risk" closed in this session. **Recommend treating this as the top-priority open finding** -- gate these routes (even a minimal shared-secret header) before `ui/app.py` is ever run anywhere network-reachable, or consider reverting the tracker-route wiring specifically until this lands. IH-014 itself was correct and narrowly scoped to fix; this is a note about IH-025's changed risk profile, not a flaw in that fix.
+
 **Tests required:** Route-level tests asserting a 401/403 without credentials, once authentication is added (currently there is nothing to test -- every route is open by design/oversight).
 
 **Branch/PR/commit that fixes it:** Not yet fixed.
@@ -977,6 +984,7 @@ python -m pytest tests/unit/test_delete_from_drive_safe_default.py -v
 
 **Exact file and line evidence:**
 - `projects/campaign-tracker/main.py:39-68` -- campaign name and dates interpolated directly into an `INSERT`
+- `projects/campaign-tracker/main_new.py:73-102` -- same pattern (`campaign.campaign_name`, `country`, `campaign.type`, dates via f-string), added to this evidence list 2026-08-20 by automated security review: IH-014 (this session) fixed this file's broken import, so it is now reachable from `ui/app.py`/`campaign_manager.py` for the first time -- previously moot since the whole module failed to import
 - `projects/segments/scripts/query_orchestrator.py:197-204` -- POI filter values interpolated into a quoted SQL `IN (...)` list
 - `projects/automation/upload_backend.py:89, 98` -- Drive `q=` search strings built via f-string interpolation of `folder_name`/`file_prefix`
 - `projects/segments/scripts/transfer_to_drive.py:56-57` -- Drive folder-search query built the same way
@@ -1328,3 +1336,49 @@ code fix.
 
 **Branch/PR/commit that fixes it:** N/A.
 **Date resolved:** N/A
+
+---
+
+## Findings from automated review of this session's own fixes
+
+*IH-044 was found by a read-only `data-pipeline-reviewer` sub-agent run
+against this session's diff, then independently verified against the real
+source before being fixed. A second finding from the same review pass
+(claimed `IndexError`/name desync in `Write_output_to_files` from
+excluded segments) was investigated and found to be a false positive --
+see the note at the end of this section.*
+
+### IH-044
+**Title:** `navigate_and_search_file`'s `month_name` default evaluated once at import, not per call
+**Severity:** High
+**Status:** Fixed
+**Date discovered:** 2026-08-20, by automated review of this session's IH-021 fix (present at `main` baseline and on this branch beforehand; not introduced by any fix this session)
+
+**Business impact:** `projects/automation/main.py` is the Cloud Function entry point (`.github/workflows/deploy.yml`), and Cloud Functions/Cloud Run routinely reuse a warm process across many invocations without re-importing modules. If a warm instance survives a calendar-month boundary, every call to `navigate_and_search_file` that omits `month_name` (the primary call site, `upload_backend.py:527-529`) keeps searching the *previous* month's Drive folder indefinitely, until the next cold start -- silently, with no error. `navigate_and_search_file` returns `(0, 0, 0)` when the month folder isn't found, which `backend_processing` reports as `"No Backend reports for {backend_report} were found this week"` -- indistinguishable from "there really were no reports," and easily lost inside IH-002's bare-except/HTTP-200 pipeline.
+
+**Technical explanation:** `def navigate_and_search_file(..., month_name=datetime.now().strftime("%B")):` -- Python evaluates a default argument expression once, at function-definition time (i.e. at module import), not on every call. The day-1-7 fallback path (`upload_backend.py:534-545`) computes `last_month` freshly on every call and is unaffected; only the default-argument path is stale.
+
+**Exact file and line evidence:**
+- `projects/automation/upload_backend.py:19-24` (the buggy default, before this fix)
+- `projects/automation/upload_backend.py:527-529` (`backend_processing`'s primary call site, relies on the default)
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_upload_backend_navigate_month.py -v
+```
+Freezes the module's `datetime` name (same pattern as `tests/unit/test_get_run_dates.py`) to two different months across two calls with no `month_name` argument, against a fake Drive service recording the query text, and asserts the searched month changes between calls. No network, no credentials.
+
+**Fix applied:** `month_name=datetime.now().strftime("%B")` -> `month_name=None`, with `if month_name is None: month_name = datetime.now().strftime("%B")` computed inside the function body, so it re-evaluates on every call. The explicit-argument call site (`upload_backend.py:543-545`, passing `last_month`) is unaffected either way.
+
+**Recommended correction:** ~~Compute `month_name` inside the function body, not the signature~~ Done.
+
+**Tests required:** `tests/unit/test_upload_backend_navigate_month.py` (new, 1 test).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
+
+---
+
+### Reviewer finding investigated and found to be a false positive
+
+The same review pass also reported a "HIGH" finding that `Write_output_to_files` (`projects/segments/scripts/split_segments.py`) would desync `names[i]` from the file being written whenever a segment was excluded, since `read_data_folder` "skips excluded files" when building `names`. **This does not reproduce.** Reading the actual code (not just the audit's prose) shows `read_data_folder` appends to `names` *before* its exclusion check (`names.append(name)` precedes `if is_excluded: continue`), so `names` contains one entry per country-matching file regardless of exclusion status -- the exclusion only skips that file's DIDs from the *control-candidate pool*, not its entry in `names`. `Write_output_to_files`'s second loop iterates the same directory with the same country filter and no exclusion check, so it stays in lockstep with `names` by construction. Verified empirically (not just by re-reading) with three raw files for one country, one excluded, confirming no `IndexError` and that each served file's content matches its own segment. No finding was opened for this; recorded here so it isn't re-investigated from scratch by a future reader who trusts the review agent's prose over the actual source.

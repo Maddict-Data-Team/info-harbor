@@ -413,6 +413,93 @@ touched.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — automated review pass: IH-044 fixed, IH-025 escalated, one false positive investigated
+
+**Goal:** Run the read-only `data-pipeline-reviewer` and `security-parity-reviewer`
+sub-agents against this session's diff (`3be3697..HEAD` at the time),
+per explicit authorization ("run the repository's read-only data-pipeline
+and security/parity reviewers at sensible batch boundaries... correct
+clear reviewer findings within the authorized scope").
+
+**New finding fixed:**
+- **IH-044** (High) -- `projects/automation/upload_backend.py`'s
+  `navigate_and_search_file(..., month_name=datetime.now().strftime("%B"))`
+  evaluates its default argument once, at module-import time, not per
+  call. On a warm Cloud Function instance reused across a month boundary,
+  every call omitting `month_name` (the primary call site) keeps
+  searching the *previous* month's Drive folder indefinitely, silently,
+  until the next cold start. Fixed: default changed to `None`, with the
+  real computation moved inside the function body. Found by the
+  data-pipeline-reviewer, independently verified against the actual
+  source (not just the review's prose) before fixing.
+
+**Existing finding's severity/urgency updated (not re-implemented):**
+- **IH-025** (Critical, still Open) -- the security-parity-reviewer
+  flagged that this session's IH-014 fix (making
+  `projects/campaign-tracker/main_new.py` importable) reactivates
+  `/api/run-all-trackers` and the other tracker-run routes in `ui/app.py`
+  -- previously always failing with `ModuleNotFoundError`, now capable of
+  a real, unauthenticated, no-CSRF BigQuery write across every campaign in
+  the registry. IH-025's own text already anticipated this exact route's
+  blast radius, but written while the import was still broken (latent,
+  not live). Updated the finding to flag it as now live-exploitable and
+  recommend prioritizing it. IH-014 itself was not changed -- it's
+  correct and narrowly scoped; this is a risk-profile note, not a defect
+  in that fix.
+
+**Existing finding's evidence extended:**
+- **IH-030** (Open) -- added `projects/campaign-tracker/main_new.py:73-102`
+  (same unparameterized-`INSERT` pattern as the already-listed `main.py`)
+  to the evidence list, since IH-014 makes this file reachable for the
+  first time.
+
+**Existing findings' write-ups extended with reviewer-found nuance (not
+re-opened, not re-implemented):**
+- **IH-012** -- noted that this session's `.result()` addition serializes
+  the per-country loop, turning the unfixed `id`-offset formula into a
+  growing-gap pattern instead of a collision risk, and that a mid-loop
+  failure now stops immediately with earlier countries already committed.
+  Reinforces the existing decision-queue recommendation (single multi-row
+  `INSERT`); doesn't change it.
+- **IH-009** -- noted that `'w'` mode trades duplicate-row corruption
+  (fixed) for silent truncation-on-mid-fetch-failure (pre-existing, not
+  introduced by this fix), and that the script's own direct
+  `__main__` entry point doesn't call `reset_folders()` first either.
+
+**Reviewer finding investigated and found to be a false positive (no
+finding opened, no code changed):** the data-pipeline-reviewer also
+reported that `Write_output_to_files` (`split_segments.py`) would desync
+`names[i]` from the file being written when a segment is excluded. Reading
+the actual code shows `read_data_folder` appends to `names` *before* its
+exclusion check, so `names` has one entry per country-matching file
+regardless of exclusion status, staying in lockstep with the second loop's
+own unfiltered iteration by construction. Verified empirically with a
+3-file/1-excluded reproduction (no `IndexError`, correct per-segment
+content) before discarding the finding. A refactor attempted while
+investigating this (extracting a shared `_is_excluded` helper) was
+reverted (`git checkout --`) once the underlying claim didn't hold, to
+keep this branch's diff limited to actual fixes. Recorded in
+`docs/code-audit.md` so a future reader doesn't re-investigate the same
+non-issue from the review's prose alone.
+
+**Files changed:** `projects/automation/upload_backend.py` (IH-044 fix),
+`tests/unit/test_upload_backend_navigate_month.py` (new, 1 test),
+`docs/code-audit.md` (new IH-044 entry, IH-025/IH-030/IH-012/IH-009
+updates, false-positive note).
+
+**Tests:** focused (1) and full suite passing:
+```
+python -m pytest -q
+# 70 passed
+```
+
+**Parity implications:** IH-044's fix changes `navigate_and_search_file`'s
+behavior only when the process is warm across a month boundary and the
+caller omits `month_name` -- the common case (cold start, or within the
+same month) is unaffected.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

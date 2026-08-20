@@ -20,8 +20,16 @@ def navigate_and_search_file(
     drive_service,
     backend_reports_folder_id,
     backend_report,
-    month_name=datetime.now().strftime("%B"),
+    month_name=None,
 ):
+    # month_name defaulted to datetime.now().strftime("%B") in the
+    # signature, which Python evaluates once at function-definition time
+    # (module import), not per call -- on a warm Cloud Function instance
+    # reused across a month boundary, every call omitting month_name would
+    # keep searching the *previous* month's folder until the next cold
+    # start, with no error (IH-044). Computed here instead, per call.
+    if month_name is None:
+        month_name = datetime.now().strftime("%B")
 
     # Specifying the date you want to test with
     today = datetime.now()
