@@ -7,6 +7,34 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-035 fixed (autonomous refinement continues)
+
+**Goal:** First checkpoint of the continued autonomous refinement pass,
+per explicit authorization to proceed through all remaining unblocked
+findings without stopping between them.
+
+**Finding fixed:**
+- **IH-035** (Low) -- added `pandas==2.1.1` to `projects/automation/requirements.txt`
+  (the file Cloud Functions actually installs from). `data_validation.py`
+  imports `pandas` but it was undeclared there; latent today (not imported
+  by `main.py`), but a deploy-time `ModuleNotFoundError` waiting to happen.
+  Pin matches the root `requirements.txt`'s existing pin. Confirmed no
+  other imports in `data_validation.py` are similarly undeclared.
+
+**Files changed:** `projects/automation/requirements.txt` (1 line),
+`tests/unit/test_automation_requirements.py` (new, 1 test), `docs/code-audit.md`.
+
+**Tests:** focused (1) and full suite both passing:
+```
+python -m pytest -q
+# 56 passed
+```
+
+**Parity implications:** None -- adds a missing dependency declaration,
+does not change any code path's behavior.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

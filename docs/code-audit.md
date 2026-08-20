@@ -65,7 +65,7 @@ validation" instead, however plausible it looks.
 | [IH-032](#ih-032) | Combined `{code_name}_Segments` table appended without dedupe on rerun | Medium | Open |
 | [IH-033](#ih-033) | O(lines) redundant Drive upload calls in the old `transfer_to_drive.py` | Low | **Fixed** |
 | [IH-034](#ih-034) | CI deploys to production on every push to `main`, no tests, no gate | High | Open |
-| [IH-035](#ih-035) | `pandas` imported by `data_validation.py` but undeclared in deployed requirements | Low | Open |
+| [IH-035](#ih-035) | `pandas` imported by `data_validation.py` but undeclared in deployed requirements | Low | **Fixed** |
 | [IH-036](#ih-036) | `projects/poi/` added with no tests, no CI wiring, no prior documentation | Medium | Needs Validation |
 | [IH-037](#ih-037) | No test suite existed; `.gitignore`'s `test*` pattern actively blocked one | Critical | **Fixed** |
 | [IH-038](#ih-038) | `projects/poi/` was undocumented prior to this branch | Low | **Fixed** |
@@ -1050,7 +1050,7 @@ Parses `ui/app.py`'s source with `ast` (never imports or runs the module) and as
 ### IH-035
 **Title:** `pandas` imported by `data_validation.py` but undeclared in deployed requirements
 **Severity:** Low
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (identical on main; both files unchanged on this branch)
 
 **Business impact:** `data_validation.py` sits inside `projects/automation/` (the directory Cloud Functions deploys from) but is not imported by `main.py`, so the deployed function does not currently break -- but the moment anyone imports it from a reachable code path, the deploy will fail at runtime with `ModuleNotFoundError: No module named 'pandas'`.
@@ -1062,11 +1062,20 @@ Parses `ui/app.py`'s source with `ast` (never imports or runs the module) and as
 - `projects/automation/requirements.txt` -- 10 pins, no `pandas` entry (confirmed by listing the file's contents)
 - Root `requirements.txt` (not what gets deployed) does include `pandas==2.1.1`
 
-**How to reproduce / verify safely:** Static comparison of the import statement against the deployed requirements file's contents; no deploy was performed to confirm the runtime failure.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_automation_requirements.py -v
+```
+Static text check: confirms `data_validation.py` still imports `pandas` and that `projects/automation/requirements.txt` declares it. No deploy was performed.
 
-**Recommended correction:** Add `pandas` (and confirm every other undeclared-but-imported package) to `projects/automation/requirements.txt`, or remove `data_validation.py` from the deployed source directory if it is not meant to run in that environment.
+**Fix applied:** Added `pandas==2.1.1` to `projects/automation/requirements.txt` (pin matches the root `requirements.txt`'s existing pin, so no new version introduced). The other imports in `data_validation.py` (`requests`, `google.oauth2.service_account` via `google-auth`, `googleapiclient.discovery` via `google-api-python-client`) were checked and are already declared. Did not remove `data_validation.py` from the deployed source directory (the recommended correction's other option) -- it is a standalone script not imported by `main.py`, so leaving it in place with a correct dependency is the smaller, non-destructive change.
 
-**Tests required:** A CI check (candidate for `pr-validation.yml`, not added in this branch) that diffs imports actually used under `projects/automation/` against `projects/automation/requirements.txt`.
+**Recommended correction:** ~~Add `pandas` ... to `projects/automation/requirements.txt`~~ Done. A general CI check diffing all imports under `projects/automation/` against the requirements file (the audit's broader suggestion) was not added -- out of scope for this single-finding fix.
+
+**Tests required:** `tests/unit/test_automation_requirements.py` (new) -- a narrow, targeted regression guard for this specific import/requirement pair, not the general CI linter described above.
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 **Branch/PR/commit that fixes it:** Not yet fixed.
 **Date resolved:** N/A
