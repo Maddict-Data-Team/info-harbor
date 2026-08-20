@@ -5,13 +5,14 @@ Covers:
   - Deterministic control sampling via a SEEDED random module state,
     injected only from the test process (production code and its call to
     the unseeded, module-level `random` is never modified).
-  - IH-007 (Critical, NEW on this branch): Write_output_to_files excludes
-    control-group DIDs from served output by comparing a RAW file line
-    (with trailing newline) against a set of STRIPPED DIDs, so the
-    exclusion check never matches and served/control end up overlapping.
-  - IH-008 (Critical, NEW on this branch): read_data_folder unconditionally
-    calls random.sample(population, k=100_000), which raises ValueError
-    for any segment file with fewer than 100,000 raw DID lines.
+  - IH-007 (Critical, FIXED): Write_output_to_files excludes control-group
+    DIDs from served output by comparing each raw file line, stripped, against
+    a set of STRIPPED DIDs, so the exclusion check now matches correctly and
+    served/control are disjoint.
+  - IH-008 (Critical, FIXED): read_data_folder calls
+    random.sample(population, k=min(100_000, len(population))), so it no
+    longer raises ValueError for a segment file with fewer than 100,000 raw
+    DID lines.
 
 These tests build the exact relative directory layout the module hardcodes
 ("projects/segments/data/{raw,served,controlled}") under a tmp_path via
@@ -77,14 +78,14 @@ class TestControlSamplingDeterminismUnderAnInjectedSeed:
         assert a != b, "extremely unlikely to collide with 5-of-50 sampling under different seeds"
 
 
-class TestServedControlOverlapBug:
-    """# BUG: IH-007 -- served output should NEVER contain a DID that was
+class TestServedControlDisjointness:
+    """# FIXED: IH-007 -- served output must NEVER contain a DID that was
     also placed in the control group; that disjointness is the entire
-    point of a control group. This test proves it currently does not
-    hold, using the real Write_output_to_files().
+    point of a control group. This test proves it now holds, using the
+    real, unmodified Write_output_to_files().
     """
 
-    def test_control_dids_leak_into_served_output(self, repo_root, isolated_segments_workspace):
+    def test_control_dids_are_excluded_from_served_output(self, repo_root, isolated_segments_workspace):
         mod = _load(repo_root)
         base = isolated_segments_workspace
 
@@ -101,13 +102,10 @@ class TestServedControlOverlapBug:
         served_path = base / "projects" / "segments" / "data" / "served" / "183_UAE_CarOwners_20260317_served.csv"
         served_dids = set(served_path.read_text().splitlines()[1:])  # drop header
 
-        overlap = control & served_dids
-        assert overlap, (
-            "Expected the newline/whitespace mismatch bug (IH-007) to leak "
-            "control DIDs into served output. If this assertion now fails, "
-            "the bug has been fixed -- update docs/code-audit.md IH-007 to "
-            "Fixed and rewrite this test to assert disjointness instead."
+        assert not (control & served_dids), (
+            "served output must never contain a control-group DID (IH-007)"
         )
+        assert served_dids == set(dids) - control
 
     def test_diagnosis_raw_line_never_equals_a_stripped_set_member(self):
         """Isolates the exact mechanism: `did` from `for did in inpf:` is a
@@ -119,25 +117,26 @@ class TestServedControlOverlapBug:
         assert raw_line.strip() in control
 
 
-class TestControlPoolSubsamplingCrash:
-    """# BUG: IH-008 -- read_data_folder() calls
-    random.sample([...], k=100_000) unconditionally. Any segment file with
-    fewer than 100,000 raw DID lines crashes the whole split_files() run.
+class TestControlPoolSubsamplingBelowThreshold:
+    """# FIXED: IH-008 -- read_data_folder() now calls
+    random.sample(population, k=min(100_000, len(population))), so a
+    segment file with fewer than 100,000 raw DID lines no longer crashes
+    split_files() and every DID in the file is retained.
     """
 
-    def test_small_segment_file_raises_value_error(self, repo_root, isolated_segments_workspace):
+    def test_small_segment_file_returns_all_dids_without_crashing(self, repo_root, isolated_segments_workspace):
         mod = _load(repo_root)
         base = isolated_segments_workspace
         # Deliberately far fewer than 100,000 lines -- realistic for a
         # small custom segment.
-        _write_raw_csv(base, "183_UAE_SmallSegment_20260317.csv", [f"did-{i}" for i in range(50)])
+        dids = [f"did-{i}" for i in range(50)]
+        _write_raw_csv(base, "183_UAE_SmallSegment_20260317.csv", dids)
         monkeypatch_excluded = getattr(mod, "excluded_segments", [])
         mod.excluded_segments = []
 
         try:
-            import pytest
-
-            with pytest.raises(ValueError):
-                mod.read_data_folder("UAE")
+            names, for_controlled = mod.read_data_folder("UAE")
         finally:
             mod.excluded_segments = monkeypatch_excluded
+
+        assert set(for_controlled) == set(dids)

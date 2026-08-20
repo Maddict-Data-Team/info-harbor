@@ -7,6 +7,73 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-007 and IH-008 fixed
+
+**Goal:** First Phase 4 correctness fixes, per explicit user authorization to
+run an autonomous refinement pass on `feature/safety-test-baseline` in
+priority order, starting with IH-007.
+
+**Scope-convention deviation, noted for the record:** `docs/modernization-spec.md`
+§4 lists "no pipeline logic changes" as a non-goal specific to
+`feature/safety-test-baseline`, and IH-001's recommended correction and this
+log's own 2026-08-19 "Next handoff" section both describe Phase 4 fixes as
+belonging on a dedicated correctness-fix branch, pending human approval of
+this branch first. The user explicitly and repeatedly named
+`feature/safety-test-baseline` as the branch for this work in the
+2026-08-20 authorization, so these two fixes were made directly on this
+branch rather than a new one. Recorded here rather than silently deviating
+from the documented plan.
+
+**Findings fixed:**
+- **IH-007** (Critical) -- `projects/segments/scripts/split_segments.py:131`:
+  `if did not in control:` -> `if did.strip() not in control:`. The served-file
+  exclusion check compared a raw line (with trailing `\n`) against a set of
+  stripped DIDs, so it could never match; every control DID leaked into
+  served output.
+- **IH-008** (Critical) -- `projects/segments/scripts/split_segments.py:64-66`:
+  `random.sample([...], k=100000)` -> materialize the population first, then
+  `random.sample(population, k=min(100000, len(population)))`. Any segment
+  file under 100,000 raw DID lines crashed `read_data_folder()` with
+  `ValueError`.
+
+Both were introduced by the same `split_segments.py` rewrite found in the
+uncommitted `dev` work (committed as `810e30b`), not present at the `main`
+baseline.
+
+**Files changed:**
+- `projects/segments/scripts/split_segments.py` (2 lines changed, both fixes above)
+- `tests/unit/test_split_segments_control.py` -- `TestServedControlOverlapBug`
+  flipped to `TestServedControlDisjointness` (asserts disjointness instead of
+  documenting the overlap); `TestControlPoolSubsamplingCrash` flipped to
+  `TestControlPoolSubsamplingBelowThreshold` (asserts no crash + full DID
+  retention instead of documenting the `ValueError`).
+- `docs/code-audit.md` -- IH-007 and IH-008 marked Fixed, with fix location,
+  reproduction command, and resolution date.
+
+**Tests:** focused (`test_split_segments_control.py`, 5 tests) and full suite
+both run and passing:
+```
+python -m pytest -q
+# 50 passed
+```
+
+**Parity implications:** Both are Critical bug fixes explicitly listed as
+*deliberate exceptions to parity* in `docs/modernization-spec.md` §6 -- output
+is expected to change (served CSVs will now correctly exclude control DIDs;
+small segments will no longer crash). This is the intended, approved
+behavior change, not a regression.
+
+**Not addressed, still open:** the statistical-design question flagged in
+IH-008 -- whether capping the control candidate pool at 100,000 per segment
+file (vs. sampling from the full population) is itself correct -- is
+unresolved and requires input from whoever owns the placelift methodology.
+
+**Next:** continuing to the next unblocked Critical finding per the
+documented plan (IH-005, `"Placelift NO BER"` type-normalizer bypass, is the
+next self-contained candidate -- see `docs/code-audit.md`).
+
+---
+
 ## 2026-08-19 — `feature/safety-test-baseline`
 
 **Goal:** Establish an offline, credential-free testing foundation and a

@@ -37,8 +37,8 @@ validation" instead, however plausible it looks.
 | [IH-004](#ih-004) | Database-loaded campaigns lose segment definitions | Critical | Open |
 | [IH-005](#ih-005) | `"Placelift NO BER"` bypasses the type normalizer and matches no section | Critical | Open |
 | [IH-006](#ih-006) | `"Retail Intelligence Dashboard"` type mismatch | High | Open |
-| [IH-007](#ih-007) | Served/control disjointness broken by a newline/whitespace mismatch | Critical | Open |
-| [IH-008](#ih-008) | Control-pool subsampling crashes for segments under 100,000 raw DIDs | Critical | Open |
+| [IH-007](#ih-007) | Served/control disjointness broken by a newline/whitespace mismatch | Critical | **Fixed** |
+| [IH-008](#ih-008) | Control-pool subsampling crashes for segments under 100,000 raw DIDs | Critical | **Fixed** |
 | [IH-009](#ih-009) | Raw segment CSVs opened in append mode; duplicate header/rows on rerun | High | Open |
 | [IH-010](#ih-010) | `reset_folders()` never invoked by the default segments flow | High | Open |
 | [IH-011](#ih-011) | Google Drive re-upload creates duplicate files on rerun | High | Open |
@@ -288,7 +288,7 @@ python -m pytest tests/unit/test_pipeline_type_mapping.py -v -k RetailIntelligen
 ### IH-007
 **Title:** Served/control disjointness broken by a newline/whitespace mismatch
 **Severity:** Critical
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 -- **NEW on this branch**; this file did not have this bug at the `main` baseline (`c0f2e37`). The whole `read_data_folder`/`Write_output_to_files` pair in `projects/segments/scripts/split_segments.py` was rewritten as part of the uncommitted work found on `dev` (now committed as `810e30b`, see `docs/modernization-log.md` entry 2026-08-19).
 
 **Business impact:** The control group is supposed to be excluded from the served (exposed) audience -- that separation is the entire statistical basis for a placelift measurement. On this branch, that exclusion silently does not happen: every control-group device ID is *also* written into the served output, contaminating every placelift report this pipeline produces.
@@ -317,23 +317,25 @@ python -m pytest tests/unit/test_pipeline_type_mapping.py -v -k RetailIntelligen
 
 **How to reproduce / verify safely:**
 ```
-python -m pytest tests/unit/test_split_segments_control.py -v -k ServedControlOverlapBug
+python -m pytest tests/unit/test_split_segments_control.py -v -k TestServedControlDisjointness
 ```
-This calls the real, unmodified `Write_output_to_files()` against a temp fixture directory (via the `isolated_segments_workspace` fixture) and asserts that DIDs placed in the control set appear in the resulting served CSV. Confirmed empirically: `"did-000\n" in {"did-000"}` evaluates to `False` in Python, while `"did-000\n".strip() in {"did-000"}` evaluates to `True`. No network, no credentials.
+This calls the real `Write_output_to_files()` against a temp fixture directory (via the `isolated_segments_workspace` fixture) and now asserts that DIDs placed in the control set are absent from the resulting served CSV, and that served equals the raw set minus control. No network, no credentials.
 
-**Recommended correction:** Compare `did.strip()` (or the already-consistent stripped values) against `control`, not the raw line.
+**Fix applied:** `projects/segments/scripts/split_segments.py:131` now compares `did.strip()` against `control` instead of the raw line (`if did.strip() not in control:`). No other line in `Write_output_to_files()` changed.
 
-**Tests required:** `tests/unit/test_split_segments_control.py` (added, passing, marked `# BUG: IH-007`). A follow-up test asserting disjointness once fixed (the current test explicitly documents it should be inverted to an assertion of *no* overlap once this is corrected).
+**Recommended correction:** ~~Compare `did.strip()` (or the already-consistent stripped values) against `control`, not the raw line.~~ Done.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_split_segments_control.py::TestServedControlDisjointness` (flipped from `TestServedControlOverlapBug`; now asserts disjointness instead of documenting the overlap).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 
 ### IH-008
 **Title:** Control-pool subsampling crashes for segments under 100,000 raw DIDs
 **Severity:** Critical
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 -- **NEW on this branch** (same rewrite as IH-007).
 
 **Business impact:** Any segment with fewer than 100,000 raw device IDs -- a realistic size for most custom or niche segments -- crashes the entire `split_files()` run with an unhandled exception, halting segment processing for the whole campaign, not just that one segment.
@@ -349,16 +351,18 @@ This calls the real, unmodified `Write_output_to_files()` against a temp fixture
 
 **How to reproduce / verify safely:**
 ```
-python -m pytest tests/unit/test_split_segments_control.py -v -k ControlPoolSubsamplingCrash
+python -m pytest tests/unit/test_split_segments_control.py -v -k TestControlPoolSubsamplingBelowThreshold
 ```
-Writes a 50-line fixture raw CSV and asserts `read_data_folder()` raises `ValueError`. No network, no credentials.
+Writes a 50-line fixture raw CSV and asserts `read_data_folder()` returns every DID in the file without raising. No network, no credentials.
 
-**Recommended correction:** Guard the sample size with `min(100000, len(population))`, or skip subsampling entirely below a threshold. Separately worth reviewing: capping the *control candidate pool* at 100,000 per segment file (rather than sampling from the full population) can also change which devices are eligible for the control group on large segments -- a statistical design question, not just a crash bug, and is **Needs Validation** pending discussion with whoever owns the placelift methodology.
+**Fix applied:** `projects/segments/scripts/split_segments.py:64-66` now materializes `population = [line.strip() for line in inpf]` and samples `k=min(100000, len(population))`, so a segment file under 100,000 lines has every DID retained (a full, order-shuffled sample) instead of crashing.
 
-**Tests required:** `tests/unit/test_split_segments_control.py` (added, passing, marked `# BUG: IH-008`).
+**Recommended correction:** ~~Guard the sample size with `min(100000, len(population))`, or skip subsampling entirely below a threshold.~~ Done (crash fixed). The separate statistical-design question -- whether capping the *control candidate pool* at 100,000 per segment file changes control-group eligibility on large segments -- is **unresolved and out of scope for this fix**; still needs discussion with whoever owns the placelift methodology before any change to the 100,000 cap itself.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_split_segments_control.py::TestControlPoolSubsamplingBelowThreshold` (flipped from `TestControlPoolSubsamplingCrash`; now asserts no crash and full DID retention instead of documenting the `ValueError`).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 

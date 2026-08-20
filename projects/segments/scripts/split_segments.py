@@ -62,7 +62,8 @@ def read_data_folder(country):
             if is_excluded:
                 continue
             # strip any spaces or new lines and save the DID in a set
-            temp_set = set(random.sample([line.strip() for line in inpf],k=100000))
+            population = [line.strip() for line in inpf]
+            temp_set = set(random.sample(population, k=min(100000, len(population))))
             # if the data is not to be excluded append it to the set of dids to be used in the control segment
             for_controlled.update(temp_set)
     # remove the excluded dids from the for_controlled set to get the dids that will be used to get the control segment
@@ -128,7 +129,7 @@ def Write_output_to_files(control, names,country):
                 outf.write("DID\n")
                 # write the lines
                 for did in inpf:
-                    if did not in control:
+                    if did.strip() not in control:
                         outf.write(did.strip() + "\n")
         i+=1
 
