@@ -35,7 +35,7 @@ validation" instead, however plausible it looks.
 | [IH-002](#ih-002) | Silent cloud pipeline failure -- bare `except` + unconditional HTTP 200 | Critical | Open |
 | [IH-003](#ih-003) | Campaign marked `Finished` before reporting succeeds | High | Open |
 | [IH-004](#ih-004) | Database-loaded campaigns lose segment definitions | Critical | Open |
-| [IH-005](#ih-005) | `"Placelift NO BER"` bypasses the type normalizer and matches no section | Critical | Open |
+| [IH-005](#ih-005) | `"Placelift NO BER"` bypasses the type normalizer and matches no section | Critical | **Fixed** |
 | [IH-006](#ih-006) | `"Retail Intelligence Dashboard"` type mismatch | High | Open |
 | [IH-007](#ih-007) | Served/control disjointness broken by a newline/whitespace mismatch | Critical | **Fixed** |
 | [IH-008](#ih-008) | Control-pool subsampling crashes for segments under 100,000 raw DIDs | Critical | **Fixed** |
@@ -227,7 +227,7 @@ This monkeypatches the module's `code_name` global to a sentinel value distinct 
 ### IH-005
 **Title:** `"Placelift NO BER"` bypasses the type normalizer and matches no `queries.ini` section
 **Severity:** Critical
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (identical on `main`; file unchanged on this branch)
 
 **Business impact:** A campaign whose `type` is stored as exactly `"Placelift NO BER"` (as opposed to being derived by the normalizer) produces **zero reporting output on every scheduled run**, and every run reports success (IH-002). This was traced with the exact reproduction case supplied by the project owner: `code_name=113`, `type="Placelift NO BER"`, `backend_report=0`, `segments=1`.
@@ -245,14 +245,16 @@ Note the irony this traces out: a campaign with `segments=1, backend_report=0` a
 ```
 python -m pytest tests/unit/test_pipeline_type_mapping.py -v -k PlacementNoBer
 ```
-This builds the exact `code_name=113` row via `tests/fixtures/campaign_metadata.py::placelift_no_ber_113`, feeds it through the real `get_metadata()` against a `FakeBigQueryClient`, and asserts (a) the type is *not* rewritten and (b) `configparser.NoSectionError` is raised against the real `queries.ini`. No network, no credentials.
+This builds the exact `code_name=113` row via `tests/fixtures/campaign_metadata.py::placelift_no_ber_113`, feeds it through the real `get_metadata()` against a `FakeBigQueryClient`, and confirms (a) the type is *not* rewritten by the normalizer (correct, unrelated to this fix -- "Placelift NO BER" is not one of the 5 base literals `get_metadata` normalizes) and (b) `resolve_section_case_insensitive()` now resolves it to the real `"Placelift No BER"` section, which `config.get()` accepts without raising. No network, no credentials.
 
-**Recommended correction:** Normalize `type` comparisons case-insensitively (or canonicalize at write time in the campaign-tracker), and add a startup-time validation step that checks every distinct `type` value present in `Campaign_Tracker` against the section list, failing loudly instead of silently on an unmatched value.
+**Fix applied:** Added `resolve_section_case_insensitive(config, section_name)` to `projects/automation/query_orchestrator.py` (new function, just above `run_pipeline_queries`): returns `section_name` unchanged if `config.has_section(section_name)` already holds; otherwise scans `config.sections()` for a case-insensitive match and returns that instead; falls through to the original string unchanged if neither matches, so a genuinely-absent section still raises `NoSectionError` rather than being masked. `run_pipeline_queries` now calls it once, immediately after the "Starting queries" print, before its first `config.get(pipeline_type, ...)` -- the resolved value is then reused for every subsequent lookup in that call (including the per-query `config.get(pipeline_type, query_name)`). `get_metadata()`'s normalizer itself was **not** touched -- the fix is at the section-resolution boundary, not the type-string boundary, per the "canonicalize at write time" alternative in the original recommended correction being out of scope (it lives in a different project, campaign-tracker, and is a production-write-path change).
 
-**Tests required:** `tests/unit/test_pipeline_type_mapping.py` (added, passing). A follow-up test once the fix lands, asserting `"Placelift NO BER"` now resolves to `[Placelift No BER]`.
+**Recommended correction:** ~~Normalize `type` comparisons case-insensitively (or canonicalize at write time in the campaign-tracker)~~ Done, via case-insensitive section resolution at the `queries.ini` lookup boundary. The second half -- ~~add a startup-time validation step that checks every distinct `type` value present in `Campaign_Tracker` against the section list, failing loudly instead of silently~~ -- is **not implemented**; it requires a live `Campaign_Tracker` read to enumerate distinct values and is a larger, separate feature, flagged as a good follow-up task.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_pipeline_type_mapping.py` -- `TestConfirmedPlacementNoBerMismatch::test_resolve_section_case_insensitive_finds_the_correct_section` (new, replaces the old BUG-marked end-to-end test; proves the resolver finds `"Placelift No BER"`), `test_raw_lookup_still_raises_without_resolution` (kept, proves the fix is scoped to `run_pipeline_queries`'s call site, not a global configparser monkeypatch), and `TestConfirmedUnknownTypeMismatch::test_resolver_does_not_mask_a_genuinely_absent_section` (new, guards against over-reach for a type with no match at all).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 

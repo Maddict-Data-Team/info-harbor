@@ -74,6 +74,72 @@ next self-contained candidate -- see `docs/code-audit.md`).
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-005 fixed; IH-006 deferred
+
+**Goal:** Continue the autonomous refinement pass to the next unblocked
+Critical finding after IH-007/IH-008.
+
+**Finding fixed:**
+- **IH-005** (Critical) -- added `resolve_section_case_insensitive(config,
+  section_name)` to `projects/automation/query_orchestrator.py`, called once
+  at the top of `run_pipeline_queries` before any `config.get(pipeline_type,
+  ...)`. Resolves a `queries.ini` section case-insensitively when the exact
+  case doesn't match (e.g. Campaign_Tracker's `"Placelift NO BER"` vs. the
+  real `[Placelift No BER]` section), falling through to the original
+  string -- and the original `NoSectionError` -- when no match exists even
+  case-insensitively, so unrelated invalid types are not masked.
+  `get_metadata()`'s 5-literal normalizer was intentionally left untouched:
+  the fix sits at the section-resolution boundary, not the type-string
+  boundary, since canonicalizing at write time would mean changing a
+  different project's (campaign-tracker's) production write path.
+
+**Finding considered and explicitly deferred:**
+- **IH-006** (High) -- `"Retail Intelligence Dashboard"` vs. `[Retail
+  Intelligence]` is *not* a case mismatch (case-insensitive comparison does
+  not make them equal), so IH-005's fix does not and should not touch it.
+  Fixing it means picking a canonical name -- rename the `queries.ini`
+  section, or change the campaign config's `type` value -- which is a
+  business-naming decision, not a code defect with one correct answer.
+  Deferred per the "ambiguous business behavior" stop-condition in this
+  session's authorization; left Open, unchanged, pending input from whoever
+  owns campaign-type naming.
+
+**Files changed:**
+- `projects/automation/query_orchestrator.py` -- new function
+  `resolve_section_case_insensitive`; one call site added in
+  `run_pipeline_queries`. No other line changed.
+- `tests/unit/test_pipeline_type_mapping.py` -- `TestConfirmedPlacementNoBerMismatch`'s
+  old BUG-marked end-to-end test replaced with two tests: one proving the
+  raw configparser lookup is still case-sensitive (fix is scoped, not a
+  global monkeypatch), one proving the resolver finds the correct section.
+  Added a guard test in `TestConfirmedUnknownTypeMismatch` proving the
+  resolver does not mask a genuinely-absent section.
+- `docs/code-audit.md` -- IH-005 marked Fixed with fix location and
+  reasoning for what was deliberately left out of scope (the startup-time
+  validation half of the original recommended correction, and IH-006).
+
+**Tests:** focused (`test_pipeline_type_mapping.py`, 13 tests, 2 new) and
+full suite both run and passing:
+```
+python -m pytest -q
+# 52 passed
+```
+
+**Parity implications:** Deliberate parity exception (IH-005 is listed as
+one in `docs/modernization-spec.md` §6) -- a campaign whose `type` is
+exactly `"Placelift NO BER"` will now actually run its reporting queries
+instead of silently producing nothing. No other `pipeline_type` value's
+resolution changes (the resolver only activates when the exact-case lookup
+already fails).
+
+**Next:** next unblocked Critical/High candidates per `docs/code-audit.md`:
+IH-001 (wrong-campaign global override -- larger, touches 5 worker modules'
+import-time globals, needs careful scoping) or IH-025/IH-026 (Flask UI
+security -- IH-026 is a small, low-ambiguity config default change;
+IH-025's authentication mechanism is a larger design choice).
+
+---
+
 ## 2026-08-19 — `feature/safety-test-baseline`
 
 **Goal:** Establish an offline, credential-free testing foundation and a

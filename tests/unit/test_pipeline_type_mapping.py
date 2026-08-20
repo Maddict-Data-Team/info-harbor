@@ -65,22 +65,37 @@ class TestConfirmedPlacementNoBerMismatch:
         assert not queries_ini_config.has_section("Placelift NO BER")
         assert queries_ini_config.has_section("Placelift No BER")
 
-    def test_end_to_end_no_section_error_is_raised(
+    def test_raw_lookup_still_raises_without_resolution(
         self, orchestrator, queries_ini_config
     ):
-        """This is the exact failure that reaches the bare `except:` at
-        query_orchestrator.py:427-429 in run_by_codename, which is then
-        swallowed and reported as HTTP 200 success (IH-002). This test
-        proves the NoSectionError occurs; it does not exercise the
-        swallowing itself (that requires a live BigQuery round trip and is
-        out of scope for the offline suite).
-        # BUG: IH-005
-        """
+        """The raw configparser lookup is untouched and still case-sensitive
+        -- the fix does not monkeypatch configparser globally, it resolves
+        the section name once, in run_pipeline_queries, before the lookup."""
         pipeline_type = _resolve_pipeline_type(
             orchestrator, queries_ini_config, md.placelift_no_ber_113()
         )
         with pytest.raises(configparser.NoSectionError):
             queries_ini_config.get(pipeline_type, "queries")
+
+    def test_resolve_section_case_insensitive_finds_the_correct_section(
+        self, orchestrator, queries_ini_config
+    ):
+        """# FIXED: IH-005 -- this is the exact failure that used to reach
+        the bare `except:` at query_orchestrator.py:427-429 in
+        run_by_codename (swallowed and reported as HTTP 200 success,
+        IH-002). run_pipeline_queries now calls
+        resolve_section_case_insensitive(config, pipeline_type) before
+        every config.get(pipeline_type, ...), which resolves "Placelift NO
+        BER" to the real "Placelift No BER" section."""
+        pipeline_type = _resolve_pipeline_type(
+            orchestrator, queries_ini_config, md.placelift_no_ber_113()
+        )
+        resolved = orchestrator.resolve_section_case_insensitive(
+            queries_ini_config, pipeline_type
+        )
+        assert resolved == "Placelift No BER"
+        # Must not raise:
+        queries_ini_config.get(resolved, "queries")
 
 
 class TestConfirmedRetailIntelligenceDashboardMismatch:
@@ -113,6 +128,20 @@ class TestConfirmedUnknownTypeMismatch:
         )
         assert pipeline_type == "Unknown"
         assert not queries_ini_config.has_section("Unknown")
+
+    def test_resolver_does_not_mask_a_genuinely_absent_section(
+        self, orchestrator, queries_ini_config
+    ):
+        """Guards IH-005's fix against over-reaching: resolve_section_case_
+        insensitive must fall through unchanged (and still raise
+        NoSectionError) for a type with no case-insensitive match either,
+        not silently swallow every unmatched type."""
+        resolved = orchestrator.resolve_section_case_insensitive(
+            queries_ini_config, "Unknown"
+        )
+        assert resolved == "Unknown"
+        with pytest.raises(configparser.NoSectionError):
+            queries_ini_config.get(resolved, "queries")
 
 
 class TestWorkingCasesForContrast:

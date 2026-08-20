@@ -261,6 +261,27 @@ def get_radiuses(codename, config, bq_client):
     return radiuses
 
 
+def resolve_section_case_insensitive(config, section_name):
+    """Resolve section_name against config.sections() case-insensitively.
+
+    configparser lowercases option names but leaves section names
+    case-sensitive, so a Campaign_Tracker `type` value that differs from its
+    queries.ini section only by case (e.g. "Placelift NO BER" vs.
+    "[Placelift No BER]", see IH-005) raises NoSectionError even though the
+    intended section is unambiguous. Falls back to the original string
+    unchanged when no case-insensitive match exists either, so a genuinely
+    absent section still raises the normal NoSectionError rather than being
+    masked.
+    """
+    if config.has_section(section_name):
+        return section_name
+    lowered = section_name.lower()
+    for existing in config.sections():
+        if existing.lower() == lowered:
+            return existing
+    return section_name
+
+
 def run_pipeline_queries(
     config,
     codename,
@@ -286,6 +307,8 @@ def run_pipeline_queries(
         radiuses: list of radiuses.
     """
     print(f"Starting queries for {codename}:\n")
+    # Resolve the section case-insensitively before use (IH-005)
+    pipeline_type = resolve_section_case_insensitive(config, pipeline_type)
     # Read the query list from the config file for the given pipeline type
     queries = config.get(pipeline_type, "queries").split(",")
     # Loop over the list of query names
