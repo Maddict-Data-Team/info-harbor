@@ -4,6 +4,7 @@ Provides backward compatibility for existing projects while transitioning to sha
 """
 import sys
 import os
+import importlib.util
 from pathlib import Path
 
 # Import shared configuration at module level
@@ -18,6 +19,36 @@ from shared.config.base_config import (
 )
 from shared.config.schemas import SCHEMA_DID, SCHEMA_BACK_END, SCHEMA_COMBINED
 from shared.config.paths import SEGMENTS_DATA_DIR
+
+def load_module_from_path(module_name: str, file_path):
+    """Load a module directly from its file path via importlib, bypassing
+    normal package-based import resolution.
+
+    Needed for projects/campaign-tracker/ (IH-014): a hyphen is not a valid
+    Python package-name character, so `import
+    projects.campaign_tracker....` can never resolve, regardless of any
+    __init__.py files. Matches the importlib.util.spec_from_file_location
+    pattern already used by projects/segments/scripts/*.py to load
+    variables.py the same way.
+    """
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def get_campaign_tracker_main_new():
+    """Return projects/campaign-tracker/main_new.py's `main` function.
+
+    Loaded via load_module_from_path since `from
+    projects.campaign_tracker.main_new import main` can never resolve
+    (IH-014) -- the real directory name uses a hyphen.
+    """
+    project_root = Path(__file__).resolve().parent.parent.parent
+    module_path = project_root / "projects" / "campaign-tracker" / "main_new.py"
+    module = load_module_from_path("campaign_tracker_main_new", module_path)
+    return module.main
+
 
 # Add shared package to Python path
 def setup_shared_imports():

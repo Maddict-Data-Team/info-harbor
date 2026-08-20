@@ -108,7 +108,8 @@ def run_tracker_cmd(code_name):
         print(f"🚀 Running campaign tracker for campaign: {code_name}")
         
         # Import and run the new tracker main
-        from projects.campaign_tracker.main_new import main as tracker_main
+        from shared.utils.compatibility import get_campaign_tracker_main_new
+        tracker_main = get_campaign_tracker_main_new()
         tracker_main(code_name)
         
     except Exception as e:

@@ -65,6 +65,53 @@ date-window inversion if `[Common Queries]` ever gains a date placeholder.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-014 fixed
+
+**Finding fixed:**
+- **IH-014** (Medium) -- `projects/campaign-tracker/` uses a hyphen, so
+  `from projects.campaign_tracker.main_new import main` could never resolve
+  at any of its 4 call sites (`ui/app.py` x3, `campaign_manager.py` x1),
+  each wrapped in `try/except Exception`, so every tracker-run action
+  failed immediately and silently (a flash message or JSON error, per
+  IH-002's sibling swallow pattern for this UI). Fixed by adding
+  `load_module_from_path()` + `get_campaign_tracker_main_new()` to
+  `shared/utils/compatibility.py`, using the same
+  `importlib.util.spec_from_file_location` pattern already established in
+  `projects/segments/scripts/*.py`, and replacing all 4 call sites.
+
+**Self-caught bug during this fix:** the first pass used `replace_all` in
+`ui/app.py` with a `new_string` indented for the two 12-space call sites;
+the third call site (`api_run_all_trackers`, nested inside `for`+`try` at
+16 spaces) matched as a substring starting 4 characters into its line,
+producing a line with correct total indentation followed by a
+second line 4 spaces short -- syntactically an `IndentationError` waiting
+to happen, and semantically would have moved the tracker-load call outside
+its `try` block, losing per-campaign error isolation. Caught by
+`python -m py_compile` before running tests; fixed with a second, precise
+edit. Noted here since it's exactly the kind of unintended-change risk
+step 9 of the operating loop is meant to catch.
+
+**Files changed:** `shared/utils/compatibility.py` (2 new functions),
+`ui/app.py` (3 call sites), `campaign_manager.py` (1 call site),
+`tests/unit/test_campaign_tracker_import_path.py` (new, 2 tests),
+`docs/code-audit.md`.
+
+**Tests:** focused (2) and full suite passing:
+```
+python -m pytest -q
+# 59 passed
+```
+
+**Parity implications:** This makes a previously-always-broken code path
+(campaign-tracker execution from the UI/CLI) reachable for the first time.
+Whatever `projects/campaign-tracker/main_new.py`'s `main()` actually does
+once *called* (not just loaded) is untested and unaudited beyond this
+finding's narrow scope -- this fix only proves the module now loads and
+`main` is callable; it does not call it (would construct a real BigQuery
+client). No test or fix here executes `main()`.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

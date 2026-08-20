@@ -44,7 +44,7 @@ validation" instead, however plausible it looks.
 | [IH-011](#ih-011) | Google Drive re-upload creates duplicate files on rerun | High | Open |
 | [IH-012](#ih-012) | Unawaited tracker `INSERT` jobs; `id` assignment can race | Medium | Open |
 | [IH-013](#ih-013) | `query_HG` SQL references an unbound alias | Medium | Open |
-| [IH-014](#ih-014) | Broken `projects.campaign_tracker` import path | Medium | Open |
+| [IH-014](#ih-014) | Broken `projects.campaign_tracker` import path | Medium | **Fixed** |
 | [IH-015](#ih-015) | `projects/segments/main_new.py` fails at import | Medium | Open |
 | [IH-016](#ih-016) | `get_metadata` reads the loop variable after the loop ends | Low | Open |
 | [IH-017](#ih-017) | `[Common Queries]` recursion swaps date arguments (latent) | Medium | **Fixed** |
@@ -494,7 +494,7 @@ Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID
 ### IH-014
 **Title:** Broken `projects.campaign_tracker` import path
 **Severity:** Medium
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (identical on main; both call sites unchanged on this branch, and a third call site was added -- see IH-025)
 
 **Business impact:** Every UI action and CLI path that is supposed to run the campaign tracker fails immediately with `ModuleNotFoundError`, silently caught and shown only as a flash message or swallowed error in the UI.
@@ -508,14 +508,20 @@ Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID
 - `campaign_manager.py:111` -- same broken import, unchanged file (identical to main baseline)
 - No `__init__.py` exists anywhere under `projects/` on this branch (confirmed via directory listing), so this is a real, unconditional `ModuleNotFoundError`, not merely a style issue.
 
-**How to reproduce / verify safely:** `python -c "import projects.campaign_tracker.main_new"` raises `ModuleNotFoundError: No module named 'projects.campaign_tracker'` immediately (no network involved -- this is a pure import-resolution failure). Verified.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_campaign_tracker_import_path.py -v
+```
+Confirms `from shared.utils.compatibility import get_campaign_tracker_main_new; get_campaign_tracker_main_new()` returns a callable `main`, and separately confirms the original dotted import still raises `ModuleNotFoundError` (so a future reader isn't tempted to "simplify" the fix back to a normal import).
 
-**Recommended correction:** Either rename the directory to `campaign_tracker` (breaking any external references to the hyphenated path) or change every import site to the correct path via `importlib` machinery matching the hyphen, consistent with how other same-situation files in this repo already use `importlib.util.spec_from_file_location`.
+**Fix applied:** Added `load_module_from_path(module_name, file_path)` (general helper) and `get_campaign_tracker_main_new()` (specific to this finding) to `shared/utils/compatibility.py`, using `importlib.util.spec_from_file_location` -- the same pattern already used by `projects/segments/scripts/*.py` to load `variables.py`. Replaced all 4 broken call sites (`ui/app.py:129-130, 165-166, 198-199`; `campaign_manager.py:111-112`) with `from shared.utils.compatibility import get_campaign_tracker_main_new` + `tracker_main = get_campaign_tracker_main_new()`. Did not rename the `projects/campaign-tracker/` directory (the recommended correction's other option) -- renaming risks breaking other external references (docs, Drive paths, scripts) to the hyphenated path, while the importlib fix is scoped entirely to the 4 broken call sites.
 
-**Tests required:** A regression test asserting the intended tracker entry point is actually importable, once the fix lands (currently there is nothing valid to import).
+**Recommended correction:** ~~change every import site to the correct path via `importlib` machinery matching the hyphen~~ Done.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_campaign_tracker_import_path.py` (new, 2 tests).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 

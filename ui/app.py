@@ -126,7 +126,8 @@ def run_campaign_action(code, action):
             flash(f'Segments processing completed for campaign {code}', 'success')
             
         elif action == 'tracker':
-            from projects.campaign_tracker.main_new import main as tracker_main
+            from shared.utils.compatibility import get_campaign_tracker_main_new
+            tracker_main = get_campaign_tracker_main_new()
             tracker_main(code)
             flash(f'Campaign tracker completed for campaign {code}', 'success')
             
@@ -161,7 +162,8 @@ def api_run_campaign_action(code, action):
             return jsonify({'success': True, 'message': f'Segments processing completed for campaign {code}'})
             
         elif action == 'tracker':
-            from projects.campaign_tracker.main_new import main as tracker_main
+            from shared.utils.compatibility import get_campaign_tracker_main_new
+            tracker_main = get_campaign_tracker_main_new()
             tracker_main(code)
             return jsonify({'success': True, 'message': f'Campaign tracker completed for campaign {code}'})
             
@@ -193,7 +195,8 @@ def api_run_all_trackers():
         
         for code in campaigns.keys():
             try:
-                from projects.campaign_tracker.main_new import main as tracker_main
+                from shared.utils.compatibility import get_campaign_tracker_main_new
+                tracker_main = get_campaign_tracker_main_new()
                 tracker_main(code)
                 results.append({'code': code, 'status': 'success'})
             except Exception as e:
