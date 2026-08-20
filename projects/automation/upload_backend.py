@@ -96,13 +96,25 @@ def list_folders_inside(service, parent_folder_id, folder_name):
     return results.get("files", [])
 
 
+def _file_name_starts_with_prefix(name, file_prefix) -> bool:
+    """True if `name` actually starts with `file_prefix`, not merely
+    contains it anywhere (IH-021). The Drive query language has no anchored
+    "starts with" operator, so `name contains '{file_prefix}'` alone can
+    match a backend-report id that appears as a substring of an unrelated
+    report id (e.g. "1001" inside "21001_report.csv"). Applied as a
+    post-filter on the (necessarily broader) `contains` query's results.
+    """
+    return str(name).startswith(str(file_prefix))
+
+
 def search_files_in_folder(service, folder_id, file_prefix):
     """
     Search for files within a folder that start with a specific prefix.
     """
     query = f"'{folder_id}' in parents and name contains '{file_prefix}' and mimeType != 'application/vnd.google-apps.folder'"
     results = service.files().list(q=query, fields="files(id, name)").execute()
-    return results.get("files", [])
+    files = results.get("files", [])
+    return [f for f in files if _file_name_starts_with_prefix(f.get("name", ""), file_prefix)]
 
 
 def move_file_to_folder(service, file_id, new_parent_id):

@@ -51,7 +51,7 @@ validation" instead, however plausible it looks.
 | [IH-018](#ih-018) | Bare-date `BETWEEN` window drops the final day / UTC-vs-local-day skew | High | Open |
 | [IH-019](#ih-019) | `time_interval` accepted but never used in `get_run_dates` | Low | Open |
 | [IH-020](#ih-020) | `SELECT DISTINCT *` dedupe can destroy legitimate duplicate rows | Medium | Open |
-| [IH-021](#ih-021) | Backend-report file matching uses a Drive substring search | Medium | Open |
+| [IH-021](#ih-021) | Backend-report file matching uses a Drive substring search | Medium | **Fixed** |
 | [IH-022](#ih-022) | Stale external table reuse in `upload_backend.py` | Critical | **Fixed** |
 | [IH-023](#ih-023) | `segments/main.py` `NameError` on undefined `bq_client` | Medium | **Fixed** |
 | [IH-024](#ih-024) | `push_to_bq.py` external staging table `Conflict`-swallow | Medium | **Fixed** |
@@ -704,7 +704,7 @@ Calls the real `get_metadata()` against a `FakeBigQueryClient` returning zero ro
 ### IH-021
 **Title:** Backend-report file matching uses a Drive substring search
 **Severity:** Medium
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (identical on main; `search_files_in_folder`/`navigate_and_search_file` unchanged on this branch)
 
 **Business impact:** A backend report id that is a substring of another report id (e.g. `1001` inside `21001_report.csv`) can match the wrong file, and -- combined with the append/dedupe flow -- merge another campaign's backend data into the wrong campaign's table.
@@ -714,14 +714,20 @@ Calls the real `get_metadata()` against a `FakeBigQueryClient` returning zero ro
 **Exact file and line evidence:**
 - `projects/automation/upload_backend.py:98` -- the Drive query string concatenates `file_prefix` into a `name contains '...'` clause with no anchoring.
 
-**How to reproduce / verify safely:** Static reading; a live reproduction requires real Drive files with colliding numeric prefixes, out of scope offline.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_upload_backend_search_files.py -v
+```
+Two tests: the extracted `_file_name_starts_with_prefix` helper directly (`"21001_report.csv"` no longer matches prefix `"1001"`), and `search_files_in_folder` end-to-end against a fake Drive service returning both a true match and a substring-collision false positive, asserting only the true match survives.
 
-**Recommended correction:** Anchor the match (e.g. `name = '<exact filename>'` or a prefix check with a delimiter), or validate that exactly one file matches before proceeding.
+**Fix applied:** `projects/automation/upload_backend.py`: extracted `_file_name_starts_with_prefix(name, file_prefix)` (a plain `str.startswith` check) and applied it as a post-filter on `search_files_in_folder()`'s results, after the (still necessarily broad, since Drive's query language has no anchored "starts with" operator) `name contains '{file_prefix}'` query. Chose the post-filter approach over `name = '<exact filename>'` (the recommended correction's first alternative) because the exact filename generally isn't known in advance -- only the prefix is; the post-filter matches the function's own documented intent ("start with a specific prefix") precisely.
 
-**Tests required:** A unit test on the query-string construction once it is extracted into a testable function (currently inlined).
+**Recommended correction:** ~~Anchor the match... or validate that exactly one file matches before proceeding~~ Done, via a `startswith` post-filter.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_upload_backend_search_files.py` (new, 2 tests) -- follows the audit's own suggestion to extract the logic into a testable function first.
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 

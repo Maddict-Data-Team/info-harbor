@@ -211,6 +211,36 @@ opaque crash into a clear one.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-021 fixed
+
+**Finding fixed:**
+- **IH-021** (Medium) -- `search_files_in_folder()` used only a Drive
+  `name contains '{file_prefix}'` query with no anchoring, so a
+  backend-report id that is a substring of another id (e.g. `1001` inside
+  `21001_report.csv`) could match the wrong file. Fixed by extracting
+  `_file_name_starts_with_prefix()` and applying it as a Python-side
+  post-filter on the query results (Drive's query language itself has no
+  anchored "starts with" operator, so the initial query must stay broad).
+
+**Files changed:** `projects/automation/upload_backend.py` (extracted
+helper + post-filter), `tests/unit/test_upload_backend_search_files.py`
+(new, 2 tests), `docs/code-audit.md`.
+
+**Tests:** focused (2) and full suite passing:
+```
+python -m pytest -q
+# 64 passed
+```
+
+**Parity implications:** Deliberate correctness fix -- narrows which
+files match a given backend-report prefix to true prefix matches only.
+Could change which file(s) `upload_backend.py` picks up for a report id
+that previously had a substring collision; no such collision is known to
+exist in current data (this is a defect-prevention fix, not a response to
+an observed incident).
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed
