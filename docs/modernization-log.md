@@ -140,6 +140,74 @@ IH-025's authentication mechanism is a larger design choice).
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-026 fixed; refinement pass paused for review
+
+**Goal:** Continue the autonomous refinement pass to the next unblocked
+finding after IH-005.
+
+**Finding fixed:**
+- **IH-026** (Critical) -- `ui/app.py:401`: `app.run(debug=True,
+  host='0.0.0.0', port=5000)` -> `app.run(debug=False, host='127.0.0.1',
+  port=5000)`. Single-line config default change, no design ambiguity:
+  matches the audit's recommended correction exactly, and the UI is
+  documented as a local-only dashboard with no known deployment (`docs/
+  modernization-spec.md` §1.5). No test required (configuration, not logic).
+  Verified with `python -m compileall -q ui/app.py`; the UI itself was not
+  run, per the branch's safety boundary.
+
+**Findings evaluated and explicitly NOT attempted this pass -- all require
+either a dedicated branch or a business decision beyond this session's
+authority:**
+- **IH-001** (Critical) -- the audit's own recommended correction already
+  states this "is a pipeline-logic change and is out of scope for
+  `feature/safety-test-baseline` -- it belongs in a dedicated
+  correctness-fix branch." Also touches import-time global state across 5
+  worker modules; larger blast radius than the fixes made so far.
+- **IH-002** (Critical) -- fixing the bare `except:`/unconditional-200
+  contract requires deciding the Cloud Function's failure-reporting
+  semantics (distinguishing "skip this campaign" from "the whole run
+  failed"); the audit's own "Tests required" note says this needs the
+  pipeline-logic fix designed first, and it's entangled with the
+  not-yet-implemented `Campaign_Runs` model (`docs/modernization-spec.md`
+  §3, explicitly a future-branch design proposal).
+- **IH-004** (Critical) -- one of its two recommended corrections (extend
+  the `Campaign_Tracker` schema) is barred outright by this branch's own
+  non-goal ("no schema changes"); the other (merge DB-sourced fields with
+  the hardcoded fallback) requires a field-by-field precedence decision --
+  ambiguous business behavior, not a single correct answer.
+- **IH-006** (High) -- see the 2026-08-20 IH-005 entry above; requires
+  choosing a canonical name between two existing values, a business
+  decision.
+- **IH-025** (Critical) and **IH-027** (High) -- authentication mechanism
+  and secret-management approach are both design choices (which auth
+  scheme; env var vs. Secret Manager, and Secret Manager access is
+  explicitly out of bounds for this session regardless).
+
+**Files changed:** `ui/app.py` (1 line), `docs/code-audit.md` (IH-026 ->
+Fixed), `docs/modernization-log.md` (this entry).
+
+**Tests:** full suite still passing (no new tests needed for a config-only
+change):
+```
+python -m pytest -q
+# 52 passed
+```
+
+**Parity implications:** None measurable offline (UI is not exercised by
+the test suite); the change only affects the UI's own network exposure
+when a human runs it locally.
+
+**Status of this refinement pass:** Pausing here for human review rather
+than continuing into IH-001/002/004/006/025/027, all of which hit this
+session's stop-conditions (dedicated-branch requirement or ambiguous
+business behavior). Four findings fixed and pushed this session: IH-007,
+IH-008, IH-005, IH-026 (commits `374d64a`, `0632090`, and this entry's
+commit, all on `feature/safety-test-baseline`). See the chat-level
+consolidated review package for commit list, test results, and recommended
+review order.
+
+---
+
 ## 2026-08-19 — `feature/safety-test-baseline`
 
 **Goal:** Establish an offline, credential-free testing foundation and a

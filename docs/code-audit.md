@@ -56,7 +56,7 @@ validation" instead, however plausible it looks.
 | [IH-023](#ih-023) | `segments/main.py` `NameError` on undefined `bq_client` | Medium | **Fixed** |
 | [IH-024](#ih-024) | `push_to_bq.py` external staging table `Conflict`-swallow | Medium | **Fixed** |
 | [IH-025](#ih-025) | Flask UI has no authentication or CSRF protection on write routes | Critical | Open |
-| [IH-026](#ih-026) | Flask app runs with `debug=True` on `host='0.0.0.0'` | Critical | Open |
+| [IH-026](#ih-026) | Flask app runs with `debug=True` on `host='0.0.0.0'` | Critical | **Fixed** |
 | [IH-027](#ih-027) | Hardcoded Flask `secret_key` committed in source | High | Open |
 | [IH-028](#ih-028) | `delete_from_drive.py` ships with `DELETE_MODE = True` by default | High | Open |
 | [IH-029](#ih-029) | Inconsistent credential model (key files vs. Secret Manager) | Medium | Open |
@@ -807,7 +807,7 @@ Writes a 50-line fixture raw CSV and asserts `read_data_folder()` returns every 
 ### IH-026
 **Title:** Flask app runs with `debug=True` on `host='0.0.0.0'`
 **Severity:** Critical
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (identical on main; unchanged on this branch)
 
 **Business impact:** If this app is ever run outside a fully isolated local machine, the Werkzeug interactive debugger becomes reachable from the network, which can allow arbitrary code execution by anyone who can reach the port.
@@ -817,14 +817,16 @@ Writes a 50-line fixture raw CSV and asserts `read_data_folder()` returns every 
 **Exact file and line evidence:**
 - `ui/app.py:401` -- `app.run(debug=True, host='0.0.0.0', port=5000)`
 
-**How to reproduce / verify safely:** Static reading; not run during this audit (running the UI at all is out of the safety boundary for this branch).
+**How to reproduce / verify safely:** Static reading; not run during this fix either (running the UI at all is out of the safety boundary for this branch). Verified with `python -m compileall -q ui/app.py` (syntax only) and a re-read of the changed line.
 
-**Recommended correction:** `debug=False` outside local development, bind to `127.0.0.1` unless a reverse proxy with its own auth sits in front.
+**Fix applied:** `ui/app.py:401` -- `app.run(debug=True, host='0.0.0.0', port=5000)` -> `app.run(debug=False, host='127.0.0.1', port=5000)`. Matches the recommended correction exactly; this app is documented as "not deployed anywhere, a local dashboard" (`docs/modernization-spec.md` §1.5), so there is no known legitimate current use of network-wide binding to preserve -- if that assumption is wrong, flag it and this can be reverted or made configurable via an environment variable instead of a hardcoded default.
+
+**Recommended correction:** ~~`debug=False` outside local development, bind to `127.0.0.1` unless a reverse proxy with its own auth sits in front.~~ Done.
 
 **Tests required:** None (a configuration issue, not a logic defect).
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 
