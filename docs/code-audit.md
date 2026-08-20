@@ -817,13 +817,17 @@ Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID
 **Exact file and line evidence:**
 - `ui/app.py:401` -- `app.run(debug=True, host='0.0.0.0', port=5000)`
 
-**How to reproduce / verify safely:** Static reading; not run during this fix either (running the UI at all is out of the safety boundary for this branch). Verified with `python -m compileall -q ui/app.py` (syntax only) and a re-read of the changed line.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_ui_app_safe_defaults.py -v
+```
+Parses `ui/app.py`'s source with `ast` (never imports or runs the module) and asserts `app.run()`'s `debug` and `host` keyword arguments. Static reading; the UI itself is not run during this fix, per this branch's safety boundary. Also verified with `python -m compileall -q ui/app.py` (syntax only).
 
 **Fix applied:** `ui/app.py:401` -- `app.run(debug=True, host='0.0.0.0', port=5000)` -> `app.run(debug=False, host='127.0.0.1', port=5000)`. Matches the recommended correction exactly; this app is documented as "not deployed anywhere, a local dashboard" (`docs/modernization-spec.md` §1.5), so there is no known legitimate current use of network-wide binding to preserve -- if that assumption is wrong, flag it and this can be reverted or made configurable via an environment variable instead of a hardcoded default.
 
 **Recommended correction:** ~~`debug=False` outside local development, bind to `127.0.0.1` unless a reverse proxy with its own auth sits in front.~~ Done.
 
-**Tests required:** None (a configuration issue, not a logic defect).
+**Tests required:** `tests/unit/test_ui_app_safe_defaults.py::TestUiAppSafeRunDefaults` (added after the fix, as a regression guard against this specific default being silently reintroduced -- not required to prove the original finding, since that was a config default, not a logic defect).
 
 **Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
 **Date resolved:** 2026-08-20

@@ -7,6 +7,38 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
+
+**Goal:** Close the one gap noted when IH-026 was fixed (no test existed
+since it was originally a config default, not a logic defect) with a small
+offline regression guard, per explicit request.
+
+**Change:** Added `tests/unit/test_ui_app_safe_defaults.py`. Parses
+`ui/app.py`'s source with Python's `ast` module and asserts the `app.run()`
+call's `debug` and `host` keyword arguments -- it never imports or runs
+`ui/app.py`, so it can't trigger any of the app's own import-time behavior
+(campaign registry loading, Flask route registration, etc.) or open a
+socket. Protects specifically against `debug=True`/`host='0.0.0.0'` being
+silently reintroduced.
+
+**Files changed:**
+- `tests/unit/test_ui_app_safe_defaults.py` (new, 1 test)
+- `docs/code-audit.md` -- IH-026's "How to reproduce" and "Tests required"
+  fields updated to reference the new test.
+
+**Tests:** focused and full suite both run and passing:
+```
+python -m pytest -q tests/unit/test_ui_app_safe_defaults.py -v
+# 1 passed
+python -m pytest -q
+# 55 passed
+```
+
+**Parity implications:** None -- test-only change, no production code
+touched.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-008 review correction
 
 **Goal:** Correct the incomplete IH-008 fix found by independent data-pipeline
