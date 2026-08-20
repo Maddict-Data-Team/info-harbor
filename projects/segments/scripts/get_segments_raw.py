@@ -47,7 +47,12 @@ def get_raw_segments(countries, segments, bq_client):
                 
                 row_count = 0
                 with tqdm(desc=f"Downloading DIDs for {segment} - {country}", unit=" DID", leave=False) as pbar:
-                    with open(f"projects/segments/data/raw/{code_name}_{country}_{segment_name}_{now}.csv", 'a') as outf:
+                    # 'w' (not 'a'): truncate-then-write, so a rerun on the
+                    # same day starts this file fresh instead of duplicating
+                    # the header/rows on top of a prior run's content
+                    # (IH-009). The header below is written unconditionally
+                    # either way, which only made sense for a fresh file.
+                    with open(f"projects/segments/data/raw/{code_name}_{country}_{segment_name}_{now}.csv", 'w') as outf:
                         outf.write("DID\n")
                         for row in rows:
                             row_count += 1

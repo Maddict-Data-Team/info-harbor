@@ -39,7 +39,7 @@ validation" instead, however plausible it looks.
 | [IH-006](#ih-006) | `"Retail Intelligence Dashboard"` type mismatch | High | Open |
 | [IH-007](#ih-007) | Served/control disjointness broken by a newline/whitespace mismatch | Critical | **Fixed** |
 | [IH-008](#ih-008) | Control-pool subsampling crashes for segments under 100,000 raw DIDs | Critical | **Fixed** |
-| [IH-009](#ih-009) | Raw segment CSVs opened in append mode; duplicate header/rows on rerun | High | Open |
+| [IH-009](#ih-009) | Raw segment CSVs opened in append mode; duplicate header/rows on rerun | High | **Fixed** |
 | [IH-010](#ih-010) | `reset_folders()` never invoked by the default segments flow | High | Open |
 | [IH-011](#ih-011) | Google Drive re-upload creates duplicate files on rerun | High | Open |
 | [IH-012](#ih-012) | Unawaited tracker `INSERT` jobs; `id` assignment can race | Medium | In Progress |
@@ -371,7 +371,7 @@ Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID
 ### IH-009
 **Title:** Raw segment CSVs opened in append mode; duplicate header/rows on rerun
 **Severity:** High
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (present at main; file changed on this branch but the append-mode bug survived the rewrite)
 
 **Business impact:** Rerunning segment extraction for the same campaign on the same day appends a second `DID` header row into the middle of the raw CSV and duplicates every device ID already fetched, inflating segment counts and corrupting downstream files.
@@ -382,14 +382,20 @@ Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID
 - `projects/segments/scripts/get_segments_raw.py:45` -- `now = datetime.datetime.now().strftime("%Y%m%d")`
 - `projects/segments/scripts/get_segments_raw.py:50-51`: the file is opened with `'a'` and `outf.write("DID\n")` runs unconditionally on every call.
 
-**How to reproduce / verify safely:** Static reading; a full reproduction requires two live BigQuery-backed runs, which is out of scope offline. The append-mode and unconditional-header pattern is directly visible in the source.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_get_segments_raw_rerun.py -v
+```
+Calls the real `get_raw_segments()` twice in a row against a monkeypatched `query_orchestrator.run_query_behavior` (no BigQuery), and asserts the resulting file has exactly one `DID` header and no duplicated rows after the second call -- the exact rerun scenario this finding describes.
 
-**Recommended correction:** Open with mode `'w'` and only write the header if the file did not already exist, or truncate-then-write; alternatively fail fast if the target file already exists for the current run.
+**Fix applied:** `projects/segments/scripts/get_segments_raw.py:50`: `open(..., 'a')` -> `open(..., 'w')` (truncate-then-write, the recommended correction's first option). The unconditional header write was already correct for a fresh file; changing only the mode makes every open a fresh file, matching that assumption instead of contradicting it. Did not implement the "fail fast if the file already exists" alternative -- that would introduce new error behavior where none exists today, a larger behavior change for the same underlying goal.
 
-**Tests required:** A test asserting a second call to `get_raw_segments` against an existing file does not duplicate the header (deferred: requires mocking the BigQuery row iterator, planned for a follow-up branch).
+**Recommended correction:** ~~Open with mode `'w'`... or truncate-then-write~~ Done.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_get_segments_raw_rerun.py` (new, 1 test) -- the "mocking the BigQuery row iterator" this was deferred pending turned out to be a straightforward `monkeypatch.setattr` on `query_orchestrator.run_query_behavior`, not requiring a follow-up branch after all.
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 

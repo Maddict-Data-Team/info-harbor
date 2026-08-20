@@ -271,6 +271,37 @@ run's output.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-009 fixed
+
+**Finding fixed:**
+- **IH-009** (High) -- `get_raw_segments()` opened the per-segment raw CSV
+  with mode `'a'` and unconditionally wrote a `DID` header on every call.
+  A same-day rerun appended a second header and duplicated every device ID
+  already fetched. Fixed: `'a'` -> `'w'` (truncate-then-write). Chose this
+  over the audit's "fail fast if the file exists" alternative since it
+  doesn't introduce new error behavior for the same underlying goal.
+
+**Files changed:** `projects/segments/scripts/get_segments_raw.py` (1
+line), `tests/unit/test_get_segments_raw_rerun.py` (new, 1 test),
+`docs/code-audit.md`.
+
+**Tests:** focused (1) and full suite passing:
+```
+python -m pytest -q
+# 65 passed
+```
+The audit had deferred testing this, expecting to need to mock "the
+BigQuery row iterator" as a follow-up-branch task -- in practice a single
+`monkeypatch.setattr` on `query_orchestrator.run_query_behavior` was
+enough, so the test was added now instead of deferred further.
+
+**Parity implications:** Deliberate correctness fix -- a same-day rerun
+now produces a clean, correctly-sized raw file instead of one with a
+duplicated header and doubled rows. Single (non-rerun) runs are
+unaffected.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed
