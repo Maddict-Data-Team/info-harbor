@@ -317,15 +317,17 @@ def run_pipeline_queries(
         # If the quey name is common_queries then run the common queries specified in the config file
         if query_name == "common_queries":
             # Re-call the function with "Common ueries" as the pipeline type
+            # (IH-017: keyword args here, not positional, so a parameter
+            # reorder can't silently swap start/end again)
             run_pipeline_queries(
-                config,
-                codename,
-                start_date_q,
-                end_date_q,
-                countries,
-                "Common Queries",
-                bq_client,
-                radiuses,
+                config=config,
+                codename=codename,
+                end_date_q=end_date_q,
+                start_date_q=start_date_q,
+                countries=countries,
+                pipeline_type="Common Queries",
+                bq_client=bq_client,
+                radiuses=radiuses,
             )
             # skip the rest of the steps for this iteration
             continue

@@ -35,6 +35,36 @@ does not change any code path's behavior.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-017 fixed
+
+**Finding fixed:**
+- **IH-017** (Medium) -- `run_pipeline_queries`'s recursive call for
+  `"common_queries"` passed `(start_date_q, end_date_q)` positionally into
+  slots declared `(end_date_q, start_date_q)`, transposed. Latent (no
+  `[Common Queries]` entry in `queries.ini` currently uses either
+  placeholder), but would silently invert every date window the moment one
+  did. Fixed by switching the whole recursive call to keyword arguments, so
+  a future signature reorder can't reintroduce the swap silently.
+
+**Files changed:** `projects/automation/query_orchestrator.py` (1 call
+site), `tests/unit/test_automation_build_query.py` (renamed
+`TestCommonQueriesDateSwapIsCurrentlyLatentNotActive` ->
+`TestCommonQueriesDateSwapFixed`; kept the placeholder-absence guard, added
+a test that intercepts the real recursive call and asserts the dates
+arrive unswapped), `docs/code-audit.md`.
+
+**Tests:** focused (6) and full suite passing:
+```
+python -m pytest -q
+# 57 passed
+```
+
+**Parity implications:** None observable today (the bug was never
+triggered by current `queries.ini` content); prevents a future silent
+date-window inversion if `[Common Queries]` ever gains a date placeholder.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

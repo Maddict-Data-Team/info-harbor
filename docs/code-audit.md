@@ -47,7 +47,7 @@ validation" instead, however plausible it looks.
 | [IH-014](#ih-014) | Broken `projects.campaign_tracker` import path | Medium | Open |
 | [IH-015](#ih-015) | `projects/segments/main_new.py` fails at import | Medium | Open |
 | [IH-016](#ih-016) | `get_metadata` reads the loop variable after the loop ends | Low | Open |
-| [IH-017](#ih-017) | `[Common Queries]` recursion swaps date arguments (latent) | Medium | Open |
+| [IH-017](#ih-017) | `[Common Queries]` recursion swaps date arguments (latent) | Medium | **Fixed** |
 | [IH-018](#ih-018) | Bare-date `BETWEEN` window drops the final day / UTC-vs-local-day skew | High | Open |
 | [IH-019](#ih-019) | `time_interval` accepted but never used in `get_run_dates` | Low | Open |
 | [IH-020](#ih-020) | `SELECT DISTINCT *` dedupe can destroy legitimate duplicate rows | Medium | Open |
@@ -571,7 +571,7 @@ Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID
 ### IH-017
 **Title:** `[Common Queries]` recursion swaps date arguments (latent)
 **Severity:** Medium
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (identical on main; file unchanged on this branch)
 
 **Business impact:** Currently none -- see below. The moment a date-window placeholder is added to any query under `[Common Queries]`, every one of those nine queries will silently run with the start/end dates inverted, with no error raised.
@@ -584,14 +584,16 @@ Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID
 - `projects/automation/query_orchestrator.py:413-424` (the correct top-level call, for contrast)
 - Verified harmless today: `projects/automation/queries.ini:13-235` (`[Common Queries]`) contains zero `{start_date_q}`/`{end_date_q}` occurrences; the first such placeholder in the whole file is at line 255, inside `[Retail Intelligence]`.
 
-**How to reproduce / verify safely:** `python -m pytest tests/unit/test_automation_build_query.py -v -k CommonQueriesDateSwap`. This is a regression guard, not a bug reproduction: it asserts the current absence of date placeholders in `[Common Queries]`, so it starts failing the moment someone adds one -- at which point this finding should be treated as "the latent bug just went live."
+**How to reproduce / verify safely:** `python -m pytest tests/unit/test_automation_build_query.py -v -k CommonQueriesDateSwap`. Two tests: the original placeholder-absence guard (kept as defense-in-depth), and a new test that directly calls the real `run_pipeline_queries` and intercepts the recursive call, asserting `end_date_q`/`start_date_q` arrive unswapped.
 
-**Recommended correction:** Fix the call to pass `(end_date_q, start_date_q)` in the correct order, independent of whether any query currently depends on it.
+**Fix applied:** `projects/automation/query_orchestrator.py`'s recursive call (previously positional, in the wrong order) now passes every argument to `run_pipeline_queries` by keyword: `end_date_q=end_date_q, start_date_q=start_date_q, ...`. Switching to keyword arguments (rather than just reordering the positional ones) means a future parameter reorder in the function signature can no longer silently reintroduce this swap.
 
-**Tests required:** `tests/unit/test_automation_build_query.py::TestCommonQueriesDateSwapIsCurrentlyLatentNotActive` (added, passing).
+**Recommended correction:** ~~Fix the call to pass `(end_date_q, start_date_q)` in the correct order~~ Done, via keyword arguments.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_automation_build_query.py::TestCommonQueriesDateSwapFixed` (renamed from `TestCommonQueriesDateSwapIsCurrentlyLatentNotActive`; keeps the original placeholder-absence test and adds `test_common_queries_recursive_call_preserves_date_argument_order`).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 
