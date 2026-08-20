@@ -67,8 +67,10 @@ def metadata_placelift():
                         FROM
                         maddictdata.Metadata.Campaign_Tracker;"""
 
-            # Execute the query
-            client.query(query)
+            # Execute the query and wait for it to finish, so a failed
+            # INSERT raises here instead of being silently fired-and-
+            # forgotten (IH-012)
+            client.query(query).result()
 
 
         # Log the new code name for the campaign

@@ -241,6 +241,36 @@ an observed incident).
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-012 partially fixed (visibility only)
+
+**Finding partially fixed:**
+- **IH-012** (Medium) -- `projects/campaign-tracker/main.py`'s
+  `metadata_placelift()` called `client.query(query)` per country with no
+  `.result()`, so a failed `INSERT` was silently fired-and-forgotten. Added
+  `.result()` so failures now raise. The `id`-assignment race itself
+  (`COALESCE(MAX(id), 0) + 1 + {index}`, independently recomputed per
+  country) is **not fixed** -- moving to a single multi-row `INSERT` vs. a
+  surrogate key generator is a genuine design choice, added to the
+  decision queue rather than guessed.
+
+**Files changed:** `projects/campaign-tracker/main.py` (1 line),
+`docs/code-audit.md`.
+
+**Tests:** none added (unchanged from the audit's own assessment -- not
+offline-testable without either a live BigQuery table or a larger refactor
+to make `create_client()` injectable, out of scope here). Full suite still
+passing (no test-affecting change):
+```
+python -m pytest -q
+# 64 passed
+```
+
+**Parity implications:** Only changes behavior on the already-broken path
+(a failed INSERT) -- from silent to raised. No change to any successful
+run's output.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

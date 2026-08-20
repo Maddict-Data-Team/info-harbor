@@ -42,7 +42,7 @@ validation" instead, however plausible it looks.
 | [IH-009](#ih-009) | Raw segment CSVs opened in append mode; duplicate header/rows on rerun | High | Open |
 | [IH-010](#ih-010) | `reset_folders()` never invoked by the default segments flow | High | Open |
 | [IH-011](#ih-011) | Google Drive re-upload creates duplicate files on rerun | High | Open |
-| [IH-012](#ih-012) | Unawaited tracker `INSERT` jobs; `id` assignment can race | Medium | Open |
+| [IH-012](#ih-012) | Unawaited tracker `INSERT` jobs; `id` assignment can race | Medium | In Progress |
 | [IH-013](#ih-013) | `query_HG` SQL references an unbound alias | Medium | **Fixed** |
 | [IH-014](#ih-014) | Broken `projects.campaign_tracker` import path | Medium | **Fixed** |
 | [IH-015](#ih-015) | `projects/segments/main_new.py` fails at import | Medium | **Fixed** |
@@ -445,7 +445,7 @@ Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID
 ### IH-012
 **Title:** Unawaited tracker `INSERT` jobs; `id` assignment can race
 **Severity:** Medium
-**Status:** Open
+**Status:** In Progress
 **Date discovered:** 2026-08-19 (identical on main; `projects/campaign-tracker/main.py` unchanged on this branch)
 
 **Business impact:** Campaign metadata rows can silently fail to be written (the failure is never surfaced), and under concurrent execution, two countries' rows can compute the same "next id" and either collide or leave a gap.
@@ -458,12 +458,14 @@ Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID
 
 **How to reproduce / verify safely:** Static reading; reproducing the race requires a real BigQuery table under concurrent load, out of scope offline.
 
-**Recommended correction:** Call `.result()` on the query job and handle failures explicitly; move to a single multi-row `INSERT ... VALUES` per campaign (all countries at once) so id assignment is computed once, or use a proper surrogate key generator.
+**Fix applied (partial):** `projects/campaign-tracker/main.py:70-73`: `client.query(query)` -> `client.query(query).result()`. A failed `INSERT` now raises instead of being silently fired-and-forgotten -- `metadata_placelift()` has no surrounding `try/except`, so the exception propagates to the caller. **Not fixed:** the `id`-assignment race itself (`COALESCE(MAX(id), 0) + 1 + {index}`, recomputed independently per country) -- moving to a single multi-row `INSERT` or a surrogate key generator is a genuine design choice between two different mechanisms, not a single-answer bug fix, and is added to the decision queue.
 
-**Tests required:** None offline-testable without a live BigQuery table; note this as a live-parity test candidate in `docs/modernization-spec.md`.
+**Recommended correction:** ~~Call `.result()` on the query job~~ Done. ~~Move to a single multi-row `INSERT ... VALUES`... or use a proper surrogate key generator~~ not implemented -- design decision, see decision queue.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** None offline-testable without a live BigQuery table (unchanged from the original assessment) -- `create_client()` builds a real client with no injection point; making it testable would need the same kind of refactor IH-011 needs for `transfer_to_drive.py`, out of scope for this fix.
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch) -- partial (visibility fix only).
+**Date resolved:** N/A -- race condition remains open
 
 ---
 
