@@ -18,6 +18,9 @@ sys.path.append(project_root)
 from input import *
 
 
+control_candidate_limit = 100000
+
+
 def read_data_folder(country):
 
     # This function reads the files in the data/raw directory and saves them into three results:
@@ -63,7 +66,9 @@ def read_data_folder(country):
                 continue
             # strip any spaces or new lines and save the DID in a set
             population = [line.strip() for line in inpf]
-            temp_set = set(random.sample(population, k=min(100000, len(population))))
+            temp_set = set(
+                random.sample(population, k=min(control_candidate_limit, len(population)))
+            )
             # if the data is not to be excluded append it to the set of dids to be used in the control segment
             for_controlled.update(temp_set)
     # remove the excluded dids from the for_controlled set to get the dids that will be used to get the control segment
@@ -79,8 +84,19 @@ def get_control(for_controlled):
     # from the excluded segments removed from it
     # input needed: controlled size, which is the size of the controlled segment
 
+    # Preserve the configured 50,000-of-100,000 control ratio for smaller
+    # eligible pools instead of requesting more distinct DIDs than exist.
+    population_size = len(for_controlled)
+    proportional_size = round(
+        population_size * controlled_size / control_candidate_limit
+    )
+    sample_size = min(
+        controlled_size,
+        max(1, proportional_size) if population_size else 0,
+    )
+
     # get a random sample from the list
-    controlled_segment = random.sample(sorted(for_controlled), controlled_size)
+    controlled_segment = random.sample(sorted(for_controlled), sample_size)
     # convert the list to a set to remove any duplicates
     controlled_segment = set(controlled_segment)
 

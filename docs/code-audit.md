@@ -355,13 +355,13 @@ This calls the real `Write_output_to_files()` against a temp fixture directory (
 ```
 python -m pytest tests/unit/test_split_segments_control.py -v -k TestControlPoolSubsamplingBelowThreshold
 ```
-Writes a 50-line fixture raw CSV and asserts `read_data_folder()` returns every DID in the file without raising. No network, no credentials.
+Writes a 50-line fixture raw CSV, asserts `read_data_folder()` returns every DID, and verifies `get_control()` selects 25 DIDs (the approved 50% proportional rule) without raising. It also verifies that an empty eligible pool returns an empty control set. No network, no credentials.
 
-**Fix applied:** `projects/segments/scripts/split_segments.py:64-66` now materializes `population = [line.strip() for line in inpf]` and samples `k=min(100000, len(population))`, so a segment file under 100,000 lines has every DID retained (a full, order-shuffled sample) instead of crashing.
+**Fix applied:** `projects/segments/scripts/split_segments.py:64-66` materializes the candidate population and bounds the initial sample. Following review, `get_control()` now also handles the downstream undersized-pool path: it preserves the configured 50,000-of-100,000 ratio by selecting 50% of an eligible pool below 100,000 DIDs, capped at 50,000. Empty pools return an empty set; non-empty pools select at least one DID.
 
-**Recommended correction:** ~~Guard the sample size with `min(100000, len(population))`, or skip subsampling entirely below a threshold.~~ Done (crash fixed). The separate statistical-design question -- whether capping the *control candidate pool* at 100,000 per segment file changes control-group eligibility on large segments -- is **unresolved and out of scope for this fix**; still needs discussion with whoever owns the placelift methodology before any change to the 100,000 cap itself.
+**Recommended correction:** ~~Guard both sampling stages and define the undersized-pool behavior.~~ Done. The approved interim rule is proportional reduction to 50% for pools below 100,000; this decision is recorded in the root README for later review with the placelift methodology owner. The separate question of whether the 100,000-per-file candidate cap is statistically correct remains unresolved.
 
-**Tests required:** `tests/unit/test_split_segments_control.py::TestControlPoolSubsamplingBelowThreshold` (flipped from `TestControlPoolSubsamplingCrash`; now asserts no crash and full DID retention instead of documenting the `ValueError`).
+**Tests required:** `tests/unit/test_split_segments_control.py::TestControlPoolSubsamplingBelowThreshold` now covers candidate retention, proportional control selection, and the empty-pool boundary.
 
 **Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
 **Date resolved:** 2026-08-20

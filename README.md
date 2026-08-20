@@ -4,6 +4,15 @@ A comprehensive campaign management system designed for location-based marketing
 
 ## Modernization Status
 
+> **Control-group rule for small campaigns (decision recorded 2026-08-20):**
+> The standard configuration selects 50,000 control DIDs from a 100,000-DID
+> candidate pool. When fewer than 100,000 eligible DIDs are available, the
+> control group is reduced proportionally to 50% of the available pool
+> (rounded to the nearest whole DID, with at least one control DID for a
+> non-empty pool), rather than stopping the campaign or assigning every DID
+> to control. For pools of 100,000 or more, the 50,000-DID cap is unchanged.
+> This business rule should be reviewed with the placelift methodology owner.
+
 **Why this work is happening:** An independent audit found that Info-Harbor's
 reporting pipeline can silently produce zero output for certain campaign
 types, can run reports under the wrong campaign's identity, and has no

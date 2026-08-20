@@ -9,10 +9,9 @@ Covers:
     DIDs from served output by comparing each raw file line, stripped, against
     a set of STRIPPED DIDs, so the exclusion check now matches correctly and
     served/control are disjoint.
-  - IH-008 (Critical, FIXED): read_data_folder calls
-    random.sample(population, k=min(100_000, len(population))), so it no
-    longer raises ValueError for a segment file with fewer than 100,000 raw
-    DID lines.
+  - IH-008 (Critical, FIXED): read_data_folder bounds its candidate sample,
+    and get_control proportionally reduces the control group for eligible
+    pools below 100,000 DIDs instead of requesting more DIDs than exist.
 
 These tests build the exact relative directory layout the module hardcodes
 ("projects/segments/data/{raw,served,controlled}") under a tmp_path via
@@ -55,6 +54,7 @@ class TestControlSamplingDeterminismUnderAnInjectedSeed:
     def test_same_seed_yields_the_same_control_set(self, repo_root, isolated_segments_workspace, monkeypatch):
         mod = _load(repo_root)
         monkeypatch.setattr(mod, "controlled_size", 5, raising=False)
+        monkeypatch.setattr(mod, "control_candidate_limit", 50, raising=False)
         population = [f"did-{i:04d}" for i in range(50)]
 
         random.seed(20260317)
@@ -68,6 +68,7 @@ class TestControlSamplingDeterminismUnderAnInjectedSeed:
     def test_different_seeds_can_yield_different_control_sets(self, repo_root, isolated_segments_workspace, monkeypatch):
         mod = _load(repo_root)
         monkeypatch.setattr(mod, "controlled_size", 5, raising=False)
+        monkeypatch.setattr(mod, "control_candidate_limit", 50, raising=False)
         population = [f"did-{i:04d}" for i in range(50)]
 
         random.seed(1)
@@ -118,10 +119,8 @@ class TestServedControlDisjointness:
 
 
 class TestControlPoolSubsamplingBelowThreshold:
-    """# FIXED: IH-008 -- read_data_folder() now calls
-    random.sample(population, k=min(100_000, len(population))), so a
-    segment file with fewer than 100,000 raw DID lines no longer crashes
-    split_files() and every DID in the file is retained.
+    """# FIXED: IH-008 -- candidate and control sampling are both bounded,
+    and an undersized eligible pool uses the existing 50% control ratio.
     """
 
     def test_small_segment_file_returns_all_dids_without_crashing(self, repo_root, isolated_segments_workspace):
@@ -140,3 +139,19 @@ class TestControlPoolSubsamplingBelowThreshold:
             mod.excluded_segments = monkeypatch_excluded
 
         assert set(for_controlled) == set(dids)
+
+    def test_small_pool_uses_proportional_control_size(self, repo_root, isolated_segments_workspace, monkeypatch):
+        mod = _load(repo_root)
+        population = [f"did-{i}" for i in range(50)]
+        monkeypatch.setattr(mod, "controlled_size", 50000, raising=False)
+
+        random.seed(20260820)
+        control = mod.get_control(population)
+
+        assert len(control) == 25
+        assert control <= set(population)
+
+    def test_empty_pool_returns_empty_control(self, repo_root, isolated_segments_workspace):
+        mod = _load(repo_root)
+
+        assert mod.get_control([]) == set()

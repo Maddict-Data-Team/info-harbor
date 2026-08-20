@@ -7,6 +7,30 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-008 review correction
+
+**Goal:** Correct the incomplete IH-008 fix found by independent data-pipeline
+and security/parity review. The first fix bounded the 100,000-DID candidate
+sample but left `get_control()` requesting the fixed 50,000-DID control size,
+so a smaller eligible pool could still raise `ValueError`.
+
+**Business decision:** For fewer than 100,000 eligible DIDs, reduce the control
+group proportionally using the existing 50,000-of-100,000 ratio (50%), rounded
+to the nearest DID. Keep at least one control DID for a non-empty pool, return
+an empty control for an empty pool, and retain the 50,000 cap for larger pools.
+The root README records this interim rule for later discussion with the
+placelift methodology owner.
+
+**Changes:** `get_control()` now computes a bounded proportional sample size;
+the IH-008 tests cover a 50-DID pool producing 25 controls and the empty-pool
+boundary; `docs/code-audit.md` now describes the complete fix.
+
+**Parity:** Deliberate, approved correction. Undersized pools now produce both
+control and served populations instead of crashing. Large-pool behavior is
+unchanged.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-007 and IH-008 fixed
 
 **Goal:** First Phase 4 correctness fixes, per explicit user authorization to
