@@ -330,6 +330,31 @@ currently-observed behavior.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-036 smoke-import test added
+
+**Progress on IH-036** (Medium, Needs Validation, unchanged overall status)
+-- added `tests/unit/test_poi_main_import.py`, confirming
+`projects/poi/main.py` imports cleanly and exposes its 8 documented
+functions, per the audit's own suggested first step. Whether `projects/poi/`
+should be wired into CI/tests as a first-class component, or remain an
+intentionally standalone manual tool, is **not decided** -- added to the
+decision queue. The module's actual BigQuery write correctness remains
+unvalidated (would require live credentials), so IH-036 stays Needs
+Validation rather than moving to Fixed.
+
+**Files changed:** `tests/unit/test_poi_main_import.py` (new, 1 test),
+`docs/code-audit.md`.
+
+**Tests:** full suite passing:
+```
+python -m pytest -q
+# 67 passed
+```
+
+**Parity implications:** None -- test-only change.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

@@ -1146,11 +1146,17 @@ Static text check: confirms `data_validation.py` still imports `pandas` and that
 - `projects/poi/input.py`, `projects/poi/variables.py` (its own config, not shared with other projects)
 - Confirmed via `grep -rn "projects.poi\|projects/poi\|from poi\|import poi"` across all tracked `.py` files: no hits outside `projects/poi/` itself
 
-**How to reproduce / verify safely:** Static reading and a repository-wide grep, both performed; the module's actual BigQuery write correctness was not evaluated in depth (that would require either live credentials or a much deeper read than this audit pass covered), which is why this is filed as Needs Validation rather than a confirmed defect list.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_poi_main_import.py -v
+```
+Confirms `projects/poi/main.py` imports cleanly and exposes its 8 documented functions. Static reading and a repository-wide grep were also performed (both already done, unchanged); the module's actual BigQuery write correctness still was not evaluated in depth (would require live credentials).
 
-**Recommended correction:** Document its intended purpose and invocation method in `docs/modernization-spec.md` (done, see that file's scope notes); decide whether it should be wired into CI/tests or remains an intentionally standalone manual tool; add at least a smoke-import test.
+**Progress:** Added the smoke-import test the recommended correction suggested. Still **not decided**: whether `projects/poi/` should be wired into CI/tests as a first-class component or remain an intentionally standalone manual tool -- added to the decision queue, since it's a scope/ownership question, not a code defect. Remains **Needs Validation** overall: this test only proves the module *imports*, not that its BigQuery write logic is correct.
 
-**Tests required:** None added yet; recommended as a follow-up task, not blocking this branch's stated scope (test foundation, not full coverage).
+**Recommended correction:** Document its intended purpose (done, `docs/modernization-spec.md` §1.4); ~~add at least a smoke-import test~~ done; ~~decide whether it should be wired into CI/tests~~ not decided, see decision queue.
+
+**Tests required:** `tests/unit/test_poi_main_import.py` (new, 1 test).
 
 **Branch/PR/commit that fixes it:** N/A (this is a scope/documentation gap, not a bug to "fix").
 **Date resolved:** N/A
