@@ -384,6 +384,35 @@ Flask route is affected.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-004 characterization test added (stop-list, not fixed)
+
+**Read-only investigation of a stop-list finding**, per explicit
+authorization to characterize (but not fix) IH-001/002/004/006/025/027.
+
+**IH-004** (Critical) -- added `tests/unit/test_database_loader_segments_characterization.py`,
+calling the real, pure `create_campaign_config_from_db()` with a
+hand-built `db_data` dict (no BigQuery). Confirms `segments`,
+`custom_segments`, and `excluded_segments` are unconditionally empty
+regardless of input -- including when `has_segments=1` explicitly says the
+campaign should have segments, a direct contradiction within the returned
+`CampaignConfig` itself. **Not fixed** -- remains on the stop-list; see the
+consolidated decision queue for the two correction options (extend schema
+vs. merge with hardcoded fallback) and a recommendation.
+
+**Files changed:** `tests/unit/test_database_loader_segments_characterization.py`
+(new, 1 test), `docs/code-audit.md`.
+
+**Tests:** full suite passing:
+```
+python -m pytest -q
+# 69 passed
+```
+
+**Parity implications:** None -- test-only change, no production code
+touched.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

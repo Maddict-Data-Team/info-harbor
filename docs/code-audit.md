@@ -213,13 +213,19 @@ This monkeypatches the module's `code_name` global to a sentinel value distinct 
   ```
   (replaces, does not merge with, `HARDCODED_CAMPAIGNS`)
 
-**How to reproduce / verify safely:** Static reading; a live reproduction would require a real BigQuery connection to `Campaign_Tracker`, which is out of scope for this offline audit and this branch.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_database_loader_segments_characterization.py -v
+```
+Calls the real, pure `create_campaign_config_from_db()` directly with a hand-built `db_data` dict (no BigQuery involved) and confirms `segments`/`custom_segments`/`excluded_segments` are unconditionally empty regardless of input, including when `has_segments=1` says the campaign should have segments.
 
-**Recommended correction:** Extend the `Campaign_Tracker` schema (or a related table) to store segment definitions, or merge database-sourced fields with the hardcoded fallback per campaign rather than replacing the whole registry.
+**Status: still Open -- on this session's stop-list.** This is characterization only (2026-08-20), added per explicit authorization to investigate and add safe test coverage for stop-list findings without implementing the fix. See the decision queue for the two correction options and a recommendation.
 
-**Tests required:** A unit test asserting `create_campaign_config_from_db` preserves segment data once the schema/merge logic changes; until then, a characterization test asserting current (broken) behavior would be useful in a follow-up branch.
+**Recommended correction:** Extend the `Campaign_Tracker` schema (or a related table) to store segment definitions, or merge database-sourced fields with the hardcoded fallback per campaign rather than replacing the whole registry. **Not implemented** -- schema changes are barred by this branch's own non-goals, and choosing "extend schema" vs. "merge fallback" is a real design decision; see decision queue.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
+**Tests required:** ~~A unit test asserting create_campaign_config_from_db preserves segment data once the schema/merge logic changes~~ not yet applicable (fix not implemented). `tests/unit/test_database_loader_segments_characterization.py` (new) -- the "characterization test asserting current (broken) behavior" this entry already asked for.
+
+**Branch/PR/commit that fixes it:** Not yet fixed; characterization test added on `feature/safety-test-baseline`.
 **Date resolved:** N/A
 
 ---
