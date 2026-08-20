@@ -31,7 +31,10 @@ if project_root not in sys.path:
 FOLDER_ID_TO_DELETE = "1tTawCZ4ihAfDeKp1Xac9QiDIBICfmMuM"
 
 # Set to True to delete files, False to just list them (dry run)
-DELETE_MODE = True
+# Defaults to False (IH-028): running this script with no arguments must
+# never permanently delete files with no confirmation. Set to True
+# explicitly, deliberately, only when a delete run is actually intended.
+DELETE_MODE = False
 
 # Set to True to delete all files created by info-harbor account
 # Set to False to only delete files in the specific folder

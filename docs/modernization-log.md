@@ -302,6 +302,34 @@ unaffected.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-028 partially fixed
+
+**Finding partially fixed:**
+- **IH-028** (High) -- `delete_from_drive.py` shipped with `DELETE_MODE =
+  True`, so running it with no arguments permanently deletes files from a
+  hardcoded Drive folder, no confirmation. Flipped the default to `False`.
+  **Not implemented:** an explicit `--yes`/`--confirm` CLI flag, and a
+  required (not hardcoded) folder-id argument -- both are real feature
+  additions (no argument parsing exists in this script today), added to
+  the decision queue.
+
+**Files changed:** `projects/segments/scripts/delete_from_drive.py` (1
+line + comment), `tests/unit/test_delete_from_drive_safe_default.py` (new,
+1 test, AST-only -- does not import or run the script), `docs/code-audit.md`.
+
+**Tests:** focused (1) and full suite passing:
+```
+python -m pytest -q
+# 66 passed
+```
+
+**Parity implications:** N/A -- this script was never run in this branch's
+work and still isn't; the fix changes what happens if a human runs it with
+no arguments in the future (does nothing instead of deleting), not any
+currently-observed behavior.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

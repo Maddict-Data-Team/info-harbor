@@ -58,7 +58,7 @@ validation" instead, however plausible it looks.
 | [IH-025](#ih-025) | Flask UI has no authentication or CSRF protection on write routes | Critical | Open |
 | [IH-026](#ih-026) | Flask app runs with `debug=True` on `host='0.0.0.0'` | Critical | **Fixed** |
 | [IH-027](#ih-027) | Hardcoded Flask `secret_key` committed in source | High | Open |
-| [IH-028](#ih-028) | `delete_from_drive.py` ships with `DELETE_MODE = True` by default | High | Open |
+| [IH-028](#ih-028) | `delete_from_drive.py` ships with `DELETE_MODE = True` by default | High | In Progress |
 | [IH-029](#ih-029) | Inconsistent credential model (key files vs. Secret Manager) | Medium | Open |
 | [IH-030](#ih-030) | Unparameterized SQL and Drive query-string interpolation throughout | High | Open |
 | [IH-031](#ih-031) | `{codename}_visitors` uses `WRITE_APPEND` with an overlapping window | High | Open |
@@ -904,7 +904,7 @@ Parses `ui/app.py`'s source with `ast` (never imports or runs the module) and as
 ### IH-028
 **Title:** `delete_from_drive.py` ships with `DELETE_MODE = True` by default
 **Severity:** High
-**Status:** Open
+**Status:** In Progress
 **Date discovered:** 2026-08-19 -- present at main under a different folder id; the file was substantially rewritten on this branch (622 lines changed) but the armed-by-default pattern was carried forward unchanged.
 
 **Business impact:** Running this script with no arguments permanently deletes files from a hardcoded Google Drive folder, with no confirmation prompt and no dry-run default.
@@ -916,14 +916,20 @@ Parses `ui/app.py`'s source with `ast` (never imports or runs the module) and as
 - `projects/segments/scripts/delete_from_drive.py:34` -- `DELETE_MODE = True`
 - `projects/segments/scripts/delete_from_drive.py:38` -- `DELETE_ALL_FILES = False`
 
-**How to reproduce / verify safely:** Static reading of the module-level constants; this script was never executed during this audit (explicitly listed as a "do not run" boundary in AGENTS.md/CLAUDE.md).
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_delete_from_drive_safe_default.py -v
+```
+`ast`-parses the source and confirms the module-level `DELETE_MODE` assignment is `False`. Deliberately does not import the module (still on the "never run/never import" boundary) -- this script was not run or imported during this fix either.
 
-**Recommended correction:** Default `DELETE_MODE` to `False`; require an explicit `--yes`/`--confirm` CLI flag to actually delete; take the folder id as a required argument rather than a hardcoded constant.
+**Fix applied (partial):** `projects/segments/scripts/delete_from_drive.py:34`: `DELETE_MODE = True` -> `DELETE_MODE = False`. **Not implemented:** an explicit `--yes`/`--confirm` CLI flag, and taking the folder id as a required argument instead of a hardcoded constant -- both are real feature additions (this script currently has no argument parsing at all) with their own design surface, not single-answer fixes. Added to the decision queue rather than guessed here.
 
-**Tests required:** None offline (this is a deliberately dangerous script whose safe behavior is "does nothing without explicit confirmation" -- worth a unit test on the argument-parsing/guard logic once refactored to accept flags).
+**Recommended correction:** ~~Default `DELETE_MODE` to `False`~~ Done. ~~require an explicit --yes/--confirm CLI flag... take the folder id as a required argument~~ not implemented, see decision queue.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_delete_from_drive_safe_default.py` (new, 1 test) -- narrower than "once refactored to accept flags" (no refactor was done), but closes the immediate default-safety gap with a regression guard.
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch) -- partial (default flip only).
+**Date resolved:** N/A -- CLI confirmation flag and required folder-id argument remain open
 
 ---
 
