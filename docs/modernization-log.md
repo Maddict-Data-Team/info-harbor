@@ -112,6 +112,40 @@ client). No test or fix here executes `main()`.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-015 fixed
+
+**Finding fixed:**
+- **IH-015** (Medium) -- `projects/segments/main_new.py` imported its
+  worker scripts via dotted paths, but those scripts do their own flat,
+  unqualified imports internally (`from variables import *`, `import
+  query_orchestrator`), requiring `projects/segments/scripts` on
+  `sys.path` -- something `main_new.py` never did, unlike
+  `projects/segments/main.py`. Empirically confirmed broken
+  (`ModuleNotFoundError: No module named 'query_orchestrator'`) before the
+  fix, and confirmed resolved after, using the same venv all other fixes
+  on this branch are verified against.
+
+**Fix:** added `sys.path.append(str(scripts_dir))` to `main_new.py`,
+mirroring `main.py:11-15`'s existing pattern exactly.
+
+**Files changed:** `projects/segments/main_new.py` (4 lines),
+`tests/unit/test_segments_main_new_import.py` (new, 1 test),
+`docs/code-audit.md`.
+
+**Tests:** focused (1) and full suite passing:
+```
+python -m pytest -q
+# 60 passed
+```
+
+**Parity implications:** Makes a previously-always-broken import path
+(the "new" segments entry point) reachable. As with IH-014, this only
+proves the module now loads and `main` is callable -- `main()` itself
+constructs real BigQuery/Drive clients via `authenticate_get_clients()`
+and is neither called by the fix nor by the test.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

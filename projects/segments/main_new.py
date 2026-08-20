@@ -18,6 +18,15 @@ from shared.config.campaigns import get_campaign, list_campaigns
 # Setup shared imports
 setup_shared_imports()
 
+# The worker scripts below do their own flat, unqualified imports
+# (e.g. `from variables import *`, `import query_orchestrator`), which
+# require projects/segments/scripts to be on sys.path -- mirroring
+# projects/segments/main.py's own sys.path.append(scripts_dir), without
+# which the dotted imports below fail at import time with
+# ModuleNotFoundError (IH-015).
+scripts_dir = project_root / "projects" / "segments" / "scripts"
+sys.path.append(str(scripts_dir))
+
 # Import the existing scripts (they will use injected variables)
 from projects.segments.scripts.reset_folders import reset_folders
 from projects.segments.scripts.get_segments_raw import get_raw_segments

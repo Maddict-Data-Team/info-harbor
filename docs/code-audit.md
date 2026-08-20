@@ -45,7 +45,7 @@ validation" instead, however plausible it looks.
 | [IH-012](#ih-012) | Unawaited tracker `INSERT` jobs; `id` assignment can race | Medium | Open |
 | [IH-013](#ih-013) | `query_HG` SQL references an unbound alias | Medium | Open |
 | [IH-014](#ih-014) | Broken `projects.campaign_tracker` import path | Medium | **Fixed** |
-| [IH-015](#ih-015) | `projects/segments/main_new.py` fails at import | Medium | Open |
+| [IH-015](#ih-015) | `projects/segments/main_new.py` fails at import | Medium | **Fixed** |
 | [IH-016](#ih-016) | `get_metadata` reads the loop variable after the loop ends | Low | Open |
 | [IH-017](#ih-017) | `[Common Queries]` recursion swaps date arguments (latent) | Medium | **Fixed** |
 | [IH-018](#ih-018) | Bare-date `BETWEEN` window drops the final day / UTC-vs-local-day skew | High | Open |
@@ -528,7 +528,7 @@ Confirms `from shared.utils.compatibility import get_campaign_tracker_main_new; 
 ### IH-015
 **Title:** `projects/segments/main_new.py` fails at import
 **Severity:** Medium
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (identical on main; file unchanged on this branch)
 
 **Business impact:** The "new," shared/-config-based segments entry point cannot run at all; any caller (`ui/app.py`, `campaign_manager.py`) that imports it fails before doing any work.
@@ -539,14 +539,20 @@ Confirms `from shared.utils.compatibility import get_campaign_tracker_main_new; 
 - `projects/segments/main_new.py:22-28` (the `from projects.segments.scripts.* import *` block, with no preceding `sys.path` manipulation for `scripts/`)
 - Contrast: `projects/segments/main.py:11-14` does add `scripts_dir` to `sys.path` before its own (flat-style) imports
 
-**How to reproduce / verify safely:** Reading the exact chain of imports shows this fails; not independently re-executed as a live import in this offline audit pass since it requires the full dependency set installed the same way as the test venv, and is a source-level defect visible without execution.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_segments_main_new_import.py -v
+```
+Before the fix, empirically confirmed with `python -c "import projects.segments.main_new"` -> `ModuleNotFoundError: No module named 'query_orchestrator'` (the venv used to verify all fixes on this branch, not an ad hoc environment).
 
-**Recommended correction:** Add the missing `sys.path.append(...)` for `projects/segments/scripts`, or convert the worker scripts to proper package-relative imports.
+**Fix applied:** `projects/segments/main_new.py` now does `scripts_dir = project_root / "projects" / "segments" / "scripts"; sys.path.append(str(scripts_dir))` immediately before the `from projects.segments.scripts.* import *` block -- mirroring `projects/segments/main.py:11-15`'s existing pattern exactly. Did not convert the worker scripts to package-relative imports (the recommended correction's other option) -- that would touch every file under `projects/segments/scripts/`, a much larger change for the same outcome.
 
-**Tests required:** A smoke-import test once fixed.
+**Recommended correction:** ~~Add the missing `sys.path.append(...)` for `projects/segments/scripts`~~ Done.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_segments_main_new_import.py` (new) -- imports the real module and confirms `main` is callable; does not call it (would authenticate to real BigQuery/Drive).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 
