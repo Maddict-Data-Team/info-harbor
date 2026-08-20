@@ -204,6 +204,17 @@ def get_metadata(codename, config, bq_client):
     for row in metadata_raw:
         countries.append(row.country)
 
+    if not countries:
+        # IH-016: without this check, the code below silently relies on
+        # Python's loop-variable leakage (`row` from the loop above), which
+        # raises an opaque NameError if metadata_raw was empty -- swallowed
+        # by IH-002's bare except in run_by_codename. Raise a clear,
+        # descriptive error instead.
+        raise ValueError(
+            f"No Campaign_Tracker rows found for code_name={codename!r}; "
+            "cannot resolve campaign metadata."
+        )
+
     # The following metadata are the same for all rows of a certain codename
     # Extract end date
     end_date = row.end_date

@@ -180,6 +180,37 @@ compare against. Not exercised by any live BigQuery call in this branch.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-016 fixed
+
+**Finding fixed:**
+- **IH-016** (Low) -- `get_metadata()` relied on Python's loop-variable
+  leakage, reading `row.end_date` etc. after the collection loop with no
+  check that the loop ran at least once. An empty `Campaign_Tracker`
+  result (deleted/mistyped code_name) raised an opaque `NameError`,
+  swallowed by IH-002. Fixed: raises `ValueError` with a clear message
+  immediately after the loop if `countries` is empty.
+
+**Not implemented:** the recommended correction's second half (validate
+that all per-country rows agree on shared fields) -- deciding the
+behavior on disagreement is a validation-design question, not a
+single-answer fix; left open for a follow-up finding.
+
+**Files changed:** `projects/automation/query_orchestrator.py` (1 check
+added), `tests/unit/test_get_metadata_empty_result.py` (new, 1 test),
+`docs/code-audit.md`.
+
+**Tests:** focused (1) and full suite passing:
+```
+python -m pytest -q
+# 62 passed
+```
+
+**Parity implications:** None for the normal (non-empty) path -- only
+changes behavior for an already-broken case (empty result), turning an
+opaque crash into a clear one.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed

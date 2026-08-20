@@ -46,7 +46,7 @@ validation" instead, however plausible it looks.
 | [IH-013](#ih-013) | `query_HG` SQL references an unbound alias | Medium | **Fixed** |
 | [IH-014](#ih-014) | Broken `projects.campaign_tracker` import path | Medium | **Fixed** |
 | [IH-015](#ih-015) | `projects/segments/main_new.py` fails at import | Medium | **Fixed** |
-| [IH-016](#ih-016) | `get_metadata` reads the loop variable after the loop ends | Low | Open |
+| [IH-016](#ih-016) | `get_metadata` reads the loop variable after the loop ends | Low | **Fixed** |
 | [IH-017](#ih-017) | `[Common Queries]` recursion swaps date arguments (latent) | Medium | **Fixed** |
 | [IH-018](#ih-018) | Bare-date `BETWEEN` window drops the final day / UTC-vs-local-day skew | High | Open |
 | [IH-019](#ih-019) | `time_interval` accepted but never used in `get_run_dates` | Low | Open |
@@ -565,7 +565,7 @@ Before the fix, empirically confirmed with `python -c "import projects.segments.
 ### IH-016
 **Title:** `get_metadata` reads the loop variable after the loop ends
 **Severity:** Low
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (identical on main; file unchanged on this branch)
 
 **Business impact:** If a campaign's metadata query returns zero rows (e.g. the code name was deleted or mistyped), the function raises an unhelpful `NameError` instead of a clear "campaign not found" error, and that `NameError` is then swallowed by IH-002.
@@ -575,11 +575,20 @@ Before the fix, empirically confirmed with `python -c "import projects.segments.
 **Exact file and line evidence:**
 - `projects/automation/query_orchestrator.py:203-221`, specifically `:209` -- `end_date = row.end_date` (outside the `for` block that starts at `:204`)
 
-**How to reproduce / verify safely:** Static reading; an empty-result reproduction requires a live BigQuery query, out of scope offline.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_get_metadata_empty_result.py -v
+```
+Calls the real `get_metadata()` against a `FakeBigQueryClient` returning zero rows and asserts it raises `ValueError` with a clear message, instead of the previous opaque `NameError`.
 
-**Recommended correction:** Raise an explicit, descriptive error when `metadata_raw` is empty; document (or enforce) that all per-country rows for one code name must agree on shared fields.
+**Fix applied:** `projects/automation/query_orchestrator.py`'s `get_metadata()` now checks `if not countries:` immediately after the collection loop and raises `ValueError(f"No Campaign_Tracker rows found for code_name={codename!r}; cannot resolve campaign metadata.")` before reaching any post-loop `row.*` access. The second half of the recommended correction (validate that all per-country rows agree on shared fields) was **not implemented** -- deciding what to do on disagreement (raise? warn? prefer a specific row?) is a validation-design question, not a single-answer bug fix; left open for a follow-up.
 
-**Tests required:** A unit test asserting an empty `FakeBigQueryClient` result set raises a clear error once the fix lands.
+**Recommended correction:** ~~Raise an explicit, descriptive error when `metadata_raw` is empty~~ Done. ~~Document (or enforce) that all per-country rows... agree~~ not implemented, see above.
+
+**Tests required:** `tests/unit/test_get_metadata_empty_result.py` (new, 1 test).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 **Branch/PR/commit that fixes it:** Not yet fixed.
 **Date resolved:** N/A
