@@ -1,3 +1,7 @@
+import os
+import sys
+import importlib.util
+
 from google.cloud import bigquery
 from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
@@ -5,10 +9,42 @@ from google.oauth2 import service_account
 from google.cloud import secretmanager
 import json
 
-import upload_backend
-import query_orchestrator
+# This file's own directory, needed below.
+script_dir = os.path.dirname(os.path.abspath(__file__))
 
-from variables import *
+
+def _load_local_module(alias, file_name):
+    """Load a module from THIS file's own directory under a private
+    alias, bypassing sys.modules's plain-name cache entirely.
+
+    projects/segments/scripts/query_orchestrator.py is a DIFFERENT file
+    that happens to share the name "query_orchestrator", and
+    projects/segments/scripts/get_segments_raw.py does a flat `import
+    query_orchestrator` of its own. If that ran first in this same
+    long-running process (ui/app.py can reach both
+    /campaign/<code>/run/segments and /automation), a plain `import
+    query_orchestrator` or `import upload_backend` here would silently
+    reuse whatever got cached under that name first -- IH-047, found by
+    automated review of the IH-045 fix (which made this file importable
+    at all, but not import-order-safe). This is the same
+    importlib.util.spec_from_file_location pattern
+    projects/segments/scripts/*.py already use for their own
+    variables.py, and shared/utils/compatibility.py uses for IH-014.
+    """
+    path = os.path.join(script_dir, file_name)
+    spec = importlib.util.spec_from_file_location(alias, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+upload_backend = _load_local_module("automation_upload_backend", "upload_backend.py")
+query_orchestrator = _load_local_module("automation_query_orchestrator_for_main", "query_orchestrator.py")
+
+_variables_module = _load_local_module("automation_variables_for_main", "variables.py")
+for _name in dir(_variables_module):
+    if not _name.startswith("_"):
+        globals()[_name] = getattr(_variables_module, _name)
 
 
 def get_secret(secret_client, secret_name):

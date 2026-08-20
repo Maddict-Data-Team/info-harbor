@@ -13,6 +13,34 @@ A comprehensive campaign management system designed for location-based marketing
 > to control. For pools of 100,000 or more, the 50,000-DID cap is unchanged.
 > This business rule should be reviewed with the placelift methodology owner.
 
+> **Required environment variables for `ui/app.py` (decision recorded
+> 2026-08-20, IH-025/IH-027):**
+> - `INFO_HARBOR_API_TOKEN` — a shared bearer token every state-changing
+>   route (`/campaign/<code>/run/<action>`, `/api/campaign/<code>/run/<action>`,
+>   `/api/run-all-trackers`, `/api/campaigns/add`, `/automation`) requires
+>   as `Authorization: Bearer <token>`. If unset or empty, every one of
+>   those routes rejects every request with 401 — the app never falls
+>   back to "no auth required." Read-only routes are unaffected.
+> - `INFO_HARBOR_FLASK_SECRET_KEY` — the Flask session-signing key. If
+>   unset or empty, the app refuses to start rather than using a
+>   hardcoded value or a value regenerated on every process start.
+>
+> Both must be supplied securely at process-start time by whoever deploys
+> or runs this app (a secret manager, an orchestrator's secret-injection
+> mechanism, or an operator's own shell environment) — **never** committed
+> to this repository, hardcoded in source, placed in a URL, written to a
+> log, or embedded in any HTML/JavaScript served to the browser. Setting
+> these in the actual deployment/runtime environment is a human deployment
+> step, out of scope for this repository's code and CI configuration —
+> `.github/workflows/deploy.yml` was not modified as part of this change.
+>
+> This bearer-token check is an **interim internal-control mechanism**,
+> not a replacement for a real identity provider: it uses one shared
+> secret with no per-user identity, no token rotation, and no CSRF
+> protection. Treat it as closing the "wide open, no auth at all" gap
+> (`docs/code-audit.md` IH-025), not as the final security posture for
+> this UI.
+
 **Why this work is happening:** An independent audit found that Info-Harbor's
 reporting pipeline can silently produce zero output for certain campaign
 types, can run reports under the wrong campaign's identity, and has no

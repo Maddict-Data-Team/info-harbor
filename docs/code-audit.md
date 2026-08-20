@@ -55,9 +55,9 @@ validation" instead, however plausible it looks.
 | [IH-022](#ih-022) | Stale external table reuse in `upload_backend.py` | Critical | **Fixed** |
 | [IH-023](#ih-023) | `segments/main.py` `NameError` on undefined `bq_client` | Medium | **Fixed** |
 | [IH-024](#ih-024) | `push_to_bq.py` external staging table `Conflict`-swallow | Medium | **Fixed** |
-| [IH-025](#ih-025) | Flask UI has no authentication or CSRF protection on write routes | Critical | Open |
+| [IH-025](#ih-025) | Flask UI has no authentication or CSRF protection on write routes | Critical | **Fixed** (interim bearer-token control; see entry) |
 | [IH-026](#ih-026) | Flask app runs with `debug=True` on `host='0.0.0.0'` | Critical | **Fixed** |
-| [IH-027](#ih-027) | Hardcoded Flask `secret_key` committed in source | High | Open |
+| [IH-027](#ih-027) | Hardcoded Flask `secret_key` committed in source | High | **Fixed** |
 | [IH-028](#ih-028) | `delete_from_drive.py` ships with `DELETE_MODE = True` by default | High | In Progress |
 | [IH-029](#ih-029) | Inconsistent credential model (key files vs. Secret Manager) | Medium | Open |
 | [IH-030](#ih-030) | Unparameterized SQL and Drive query-string interpolation throughout | High | Open |
@@ -74,6 +74,8 @@ validation" instead, however plausible it looks.
 | [IH-041](#ih-041) | `/api/campaigns/add` reports success without persisting anything | Low | **Fixed** |
 | [IH-042](#ih-042) | `.gitignore` fix revealed a previously-hidden, untracked, live-credential test script | Medium | Needs Validation |
 | [IH-044](#ih-044) | `navigate_and_search_file`'s `month_name` default evaluated once at import, not per call | High | **Fixed** |
+| [IH-046](#ih-046) | `projects/automation/main.py` fails on dotted import (`from projects.automation.main import main`) | Medium | **Fixed** |
+| [IH-047](#ih-047) | IH-046's fix left automation's flat imports import-order-dependent against a same-named segments file | High | **Fixed** |
 
 ---
 
@@ -832,7 +834,7 @@ Two tests: the extracted `_file_name_starts_with_prefix` helper directly (`"2100
 ### IH-025
 **Title:** Flask UI has no authentication or CSRF protection on write routes
 **Severity:** Critical
-**Status:** Open
+**Status:** Fixed (interim bearer-token control)
 **Date discovered:** 2026-08-19 -- worse on this branch than at main: the write-capable route surface has grown.
 
 **Business impact:** Anyone who can reach the UI's network port can trigger production BigQuery writes and Google Drive uploads, including a route that now runs the campaign tracker for every campaign in the system with a single unauthenticated request.
@@ -853,10 +855,59 @@ Two tests: the extracted `_file_name_starts_with_prefix` helper directly (`"2100
 
 **Severity update (2026-08-20), by automated security review of this session's IH-014 fix -- still Open, not fixed, priority raised:** the `/api/run-all-trackers` blast radius described above was written while `from projects.campaign_tracker.main_new import main` was still broken (IH-014, then Open) -- every call to this route was already failing with `ModuleNotFoundError` before it could touch BigQuery, so the risk was real-but-latent. IH-014 is now Fixed (this session, `feature/safety-test-baseline`): `tracker_main = get_campaign_tracker_main_new()` (`shared/utils/compatibility.py`) makes the import succeed, so `/campaign/<code>/run/tracker`, `/api/campaign/<code>/run/tracker`, and `/api/run-all-trackers` now actually execute `metadata_placelift()` -> a real BigQuery `INSERT` per campaign per country on an unauthenticated request, with `/api/run-all-trackers` doing this for the entire campaign registry in one call. The gap between "documented risk" and "live, exploitable risk" closed in this session. **Recommend treating this as the top-priority open finding** -- gate these routes (even a minimal shared-secret header) before `ui/app.py` is ever run anywhere network-reachable, or consider reverting the tracker-route wiring specifically until this lands. IH-014 itself was correct and narrowly scoped to fix; this is a note about IH-025's changed risk profile, not a flaw in that fix.
 
-**Tests required:** Route-level tests asserting a 401/403 without credentials, once authentication is added (currently there is nothing to test -- every route is open by design/oversight).
+**Fix applied (2026-08-20, approved interim design):** Bearer-token authentication on every state-changing route, per an explicit, user-approved interim design (CSRF protection and a real identity provider are separate, larger follow-ups -- not implemented here; see below).
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Route classification (every route in `ui/app.py`, enumerated and confirmed against the file before implementation):**
+
+| Route | Method | Classification | Reason |
+|---|---|---|---|
+| `/` (`index`) | GET | Read-only | Renders dashboard from `get_live_campaigns()` |
+| `/documentation` (`documentation`) | GET | Read-only | Static template |
+| `/campaign-tracker` (`campaign_tracker`) | GET | Read-only | Static template |
+| `/campaign/<code>` (`campaign_detail`) | GET | Read-only | Reads one campaign |
+| `/campaign/<code>/run/<action>` (`run_campaign_action`) | POST | **State-changing** | `action=segments`/`tracker` calls `segments_main`/`tracker_main` (BigQuery/Drive writes) |
+| `/api/campaign/<code>/run/<action>` (`api_run_campaign_action`) | POST | **State-changing** | JSON duplicate of the above |
+| `/api/run-all-trackers` (`api_run_all_trackers`) | POST | **State-changing** | Runs the tracker for every campaign in one request -- highest blast radius |
+| `/api/campaigns/add` (`api_add_campaign`) | POST | **State-changing** | Intended to create campaign data (currently returns 501 per IH-041, but protected now so a future implementer can't forget) |
+| `/automation` (`run_automation`) | POST | **State-changing** | Calls `projects.automation.main.main()` -- BigQuery/Drive writes |
+| `/api/campaigns` (`api_campaigns`) | GET | Read-only | Lists campaigns |
+| `/api/campaign/<code>` (`api_campaign_detail`) | GET | Read-only | Reads one campaign |
+| `/api/refresh` (`refresh_campaigns`) | **POST** | Read-only (judgment call, see below) | Only calls `get_live_campaigns()` and returns a count -- no write of any kind |
+| `/health` (`health_check`) | GET | Read-only | No sensitive data |
+
+**Judgment call on `/api/refresh`:** despite the `POST` method, this route triggers no BigQuery/Drive write, no tracker/segments/automation execution, and no deletion -- it only re-reads live campaign data (which every other read route already does fresh on every call, since nothing here is cached). Classified read-only and left unprotected, consistent with "keep read-only routes unchanged." Flagged explicitly here, and locked in by `tests/unit/test_ui_app_auth.py::TestReadOnlyRoutesRemainUnprotected`, so a future reviewer doesn't assume it was simply missed because of its HTTP verb.
+
+**Protected-route list (confirmed, 5 routes):** `run_campaign_action`, `api_run_campaign_action`, `api_run_all_trackers`, `api_add_campaign`, `run_automation` -- all decorated `@require_api_token`.
+
+**Design implemented:**
+- `INFO_HARBOR_API_TOKEN` read from the environment (never hardcoded, printed, logged, committed, or placed in any template/JS).
+- Every protected route requires `Authorization: Bearer <token>`.
+- Comparison via `hmac.compare_digest()`.
+- **Fails closed:** if `INFO_HARBOR_API_TOKEN` is unset or empty, every protected route rejects every request with 401 -- there is no "no token configured, allow everything" fallback (verified by `TestApiTokenFailsClosedWhenUnconfigured`).
+- 401 response is a fixed, generic JSON body (`{"success": false, "error": "..."}`) that never reveals whether the env var is configured or echoes the submitted/expected token.
+- No CORS headers or `flask-cors` added.
+- Read-only routes are byte-for-byte unchanged.
+
+**Known, deliberate consequence:** `run_campaign_action` and `run_automation` are browser-form POST targets (their templates submit plain `<form>` POSTs, which cannot attach a custom `Authorization` header). Protecting them means these two routes can no longer be triggered via a plain browser form submit -- they now return 401 until a caller (curl, an updated frontend, or an operator tool) sends the token explicitly. This is an intentional consequence of closing IH-025, not an oversight; the frontend was not modified as part of this fix (out of scope -- this is a backend interim control, not a UI redesign).
+
+**Exact file and line evidence:**
+- `ui/app.py` -- `require_api_token` decorator and `_get_expected_api_token()`, defined once, applied to the 5 routes above
+- `projects/campaign-tracker/main_new.py`, `projects/segments/main_new.py`, `projects/automation/main.py` -- the actual write operations these routes gate (unchanged by this fix)
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_ui_app_auth.py -v
+```
+24 tests: every protected route x {no token, wrong token, valid token} (asserting the underlying mocked operation is never called when unauthorized, and is called when authorized), fail-closed behavior when the env var is unset/empty, and a guard test that fails if a future write-method route is added without being classified as protected or read-only in this file. Uses a real Flask test client against the real `ui/app.py`; every dangerous operation (`segments_main`, `tracker_main`, `automation_main`, `get_live_campaigns`) is mocked before the request reaches it -- no route in this test file constructs a real Google Cloud client (the `tests/conftest.py` guardrail fixture would fail the test loudly if one tried).
+
+**Not implemented (explicitly out of scope for this checkpoint):** CSRF protection (the approved design was bearer-token auth specifically; CSRF tokens are a separate mechanism, typically redundant with bearer-token auth for non-browser callers but still relevant if the frontend is ever updated to call these routes via `fetch`/AJAX with cookies); a real identity provider (this is explicitly an interim control, documented in `README.md`); rotating/revoking individual tokens (single shared token only); rate limiting.
+
+**Recommended correction:** ~~Add authentication... and CSRF protection~~ Authentication done (bearer token); CSRF not done, see above.
+
+**Tests required:** `tests/unit/test_ui_app_auth.py` (new, 24 tests).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 
@@ -893,7 +944,7 @@ Parses `ui/app.py`'s source with `ast` (never imports or runs the module) and as
 ### IH-027
 **Title:** Hardcoded Flask `secret_key` committed in source
 **Severity:** High
-**Status:** Open
+**Status:** Fixed
 **Date discovered:** 2026-08-19 (identical on main; unchanged on this branch)
 
 **Business impact:** Anyone with read access to this repository can forge session cookies and flash-message state for the UI.
@@ -901,16 +952,22 @@ Parses `ui/app.py`'s source with `ast` (never imports or runs the module) and as
 **Technical explanation:** The Flask session-signing key is a literal string in source rather than an environment variable or secret.
 
 **Exact file and line evidence:**
-- `ui/app.py:26` -- `app.secret_key = 'info-harbor-secret-key-2024'`
+- `ui/app.py:26` (before this fix) -- `app.secret_key = 'info-harbor-secret-key-2024'`
 
-**How to reproduce / verify safely:** Static reading.
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_ui_app_auth.py -v -k FlaskSecretKey
+```
+3 tests: importing without `INFO_HARBOR_FLASK_SECRET_KEY` set raises `RuntimeError` and refuses to start; importing with it set to an empty string does the same; two separate imports with the same env var value produce the identical `secret_key` (guards against a random-per-start fallback ever being reintroduced).
 
-**Recommended correction:** Load from an environment variable or Secret Manager; rotate the key once moved.
+**Fix applied:** `app.secret_key` now reads `INFO_HARBOR_FLASK_SECRET_KEY` from the environment. If unset or empty, the module raises `RuntimeError` at import time -- **refuses to start** -- rather than falling back to a hardcoded value or generating a random key per process start (this app uses Flask sessions: `flash()` messages ride on the session cookie, so it cannot function correctly without a real, stable key). Addressed in the same checkpoint as IH-025 since both are Flask-security config changes to the same file, fixed together per explicit instruction that IH-027 be folded in only because it's tightly related.
 
-**Tests required:** None.
+**Recommended correction:** ~~Load from an environment variable~~ Done. ~~rotate the key once moved~~ operational step, not a code change -- see `README.md`'s new deployment note.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_ui_app_auth.py::TestFlaskSecretKeyFailsClosed` (new, 3 tests).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 
@@ -1382,3 +1439,66 @@ Freezes the module's `datetime` name (same pattern as `tests/unit/test_get_run_d
 ### Reviewer finding investigated and found to be a false positive
 
 The same review pass also reported a "HIGH" finding that `Write_output_to_files` (`projects/segments/scripts/split_segments.py`) would desync `names[i]` from the file being written whenever a segment was excluded, since `read_data_folder` "skips excluded files" when building `names`. **This does not reproduce.** Reading the actual code (not just the audit's prose) shows `read_data_folder` appends to `names` *before* its exclusion check (`names.append(name)` precedes `if is_excluded: continue`), so `names` contains one entry per country-matching file regardless of exclusion status -- the exclusion only skips that file's DIDs from the *control-candidate pool*, not its entry in `names`. `Write_output_to_files`'s second loop iterates the same directory with the same country filter and no exclusion check, so it stays in lockstep with `names` by construction. Verified empirically (not just by re-reading) with three raw files for one country, one excluded, confirming no `IndexError` and that each served file's content matches its own segment. No finding was opened for this; recorded here so it isn't re-investigated from scratch by a future reader who trusts the review agent's prose over the actual source.
+
+---
+
+### IH-046
+**Title:** `projects/automation/main.py` fails on dotted import (`from projects.automation.main import main`)
+**Severity:** Medium
+**Status:** Fixed
+**Date discovered:** 2026-08-20, while preparing offline tests for the IH-025 auth checkpoint (present at `main` baseline and on this branch beforehand; not introduced by any fix this session)
+
+**Business impact:** `ui/app.py`'s `/automation` route (`run_automation`) does `from projects.automation.main import main as automation_main` -- this has always raised `ModuleNotFoundError`, so the "Run Automation" button in the UI has never worked, the same class of user-facing breakage as IH-014 (campaign-tracker) and IH-015 (segments) before their fixes.
+
+**Technical explanation:** `projects/automation/main.py` does flat, unqualified imports (`import upload_backend`, `import query_orchestrator`, `from variables import *`) with no `sys.path` handling for its own directory. This is implicit and harmless when the file is the Cloud Function deploy root (`--source projects/automation`) or run directly (`python projects/automation/main.py`, since the script's own directory is on `sys.path[0]` in that case) -- but a dotted import (`import projects.automation.main`, or `from projects.automation.main import main`) never adds `projects/automation/` to `sys.path`, so the first flat import inside the file fails.
+
+**Exact file and line evidence:**
+- `projects/automation/main.py:1-11` (before this fix) -- `import upload_backend` etc. with no preceding `sys.path` manipulation
+- `ui/app.py`'s `run_automation()` -- `from projects.automation.main import main as automation_main`, the reachable call site this breaks
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_automation_main_import.py -v
+```
+Before the fix, empirically confirmed with `python -c "import projects.automation.main"` -> `ModuleNotFoundError: No module named 'upload_backend'`, in the same venv used to verify every other fix on this branch.
+
+**Fix applied:** Mirrors the IH-015 fix exactly: added `script_dir = os.path.dirname(os.path.abspath(__file__)); if script_dir not in sys.path: sys.path.append(script_dir)` before the flat imports.
+
+**Recommended correction:** N/A -- newly discovered and fixed in the same change.
+
+**Tests required:** `tests/unit/test_automation_main_import.py` (new). Note: this module's own flat imports (`variables`, `query_orchestrator`, `upload_backend`) land in `sys.modules` under their plain, unaliased names -- every test in this file explicitly restores any prior `sys.modules` entries for those three names afterward, to avoid leaking a stale cache entry that could make an unrelated later test's own `from variables import *` (or similar) silently resolve to the wrong file. Caught by a real full-suite failure during development, not by inspection alone. **This fix alone was insufficient** -- see IH-047, found by review before this checkpoint was committed.
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
+
+---
+
+### IH-047
+**Title:** IH-046's fix left automation's flat imports import-order-dependent against a same-named segments file
+**Severity:** High
+**Status:** Fixed
+**Date discovered:** 2026-08-20, by `security-parity-reviewer` run over the IH-025/IH-027/IH-046 checkpoint before it was committed; independently reproduced before fixing.
+
+**Business impact:** `ui/app.py` is one long-running process that can reach both `/campaign/<code>/run/segments` and `/automation` (the latter newly reachable via IH-046, now newly authenticatable via IH-025). Whichever of those two is hit first in a given process's lifetime silently determines what `projects/automation/main.py`'s `query_orchestrator`/`variables` names actually point to for the rest of that process's life -- if segments' worker scripts loaded first, automation's own reporting pipeline would fail deep inside a real, credentialed BigQuery run with a confusing `NameError` (or call the wrong `query_orchestrator` entirely), not the clear `ModuleNotFoundError` it used to give before IH-046.
+
+**Technical explanation:** IH-046 fixed `projects/automation/main.py`'s `ModuleNotFoundError` by appending its own directory to `sys.path`, but its `import upload_backend`, `import query_orchestrator`, and `from variables import *` are still plain, unqualified imports. Python checks `sys.modules['<name>']` *before* consulting `sys.path` at all -- `projects/segments/scripts/query_orchestrator.py` is a different file with the same name, and `projects/segments/scripts/get_segments_raw.py` does its own flat `import query_orchestrator`; `projects/segments/scripts/split_segments.py` does its own flat `from variables import *`. If either segments worker script loads first in the process, automation's plain imports silently reuse the cached (wrong) segments modules instead of raising an error.
+
+**Exact file and line evidence:**
+- `projects/automation/main.py` (before this fix), `projects/automation/query_orchestrator.py:1-2` (before this fix), `projects/automation/upload_backend.py:1-13` (before this fix) -- the three plain flat imports
+- `projects/segments/scripts/get_segments_raw.py:6` -- `import query_orchestrator` (flat, different file)
+- `projects/segments/scripts/split_segments.py:5` -- `from variables import *` (flat, different file)
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_automation_main_import.py -v
+```
+`test_automation_main_is_import_order_safe_against_the_segments_collision` directly reproduces the scenario: imports `projects.segments.main_new` first (populating `sys.modules['query_orchestrator']`/`['variables']` with segments' files via that project's own flat imports), then imports `projects.automation.main` and confirms it still resolves to its own files. Before this fix, this reproduced empirically: `automation_main.query_orchestrator.__file__` pointed at `projects/segments/scripts/query_orchestrator.py`, and `hasattr(automation_main, 'stage_3')` was `False`.
+
+**Fix applied:** `projects/automation/main.py`, `query_orchestrator.py`, and `upload_backend.py` all now load their local dependencies (`query_orchestrator`, `upload_backend`, and each file's own `variables.py`) via `importlib.util.spec_from_file_location` under private, file-specific aliases (e.g. `"automation_query_orchestrator_for_main"`), instead of plain `import`/`from ... import *`. This is the exact pattern already established by `projects/segments/scripts/*.py` for their own `variables.py`, and by `shared/utils/compatibility.py`'s `get_campaign_tracker_main_new()` for IH-014 -- extended here to close the gap IH-046's simpler `sys.path`-only fix left open. `main.py`'s now-unnecessary `sys.path.append` was removed (no longer needed once local files are loaded by explicit path).
+
+**Recommended correction:** ~~load automation's flat-import worker modules the same way get_campaign_tracker_main_new() already does for IH-014~~ Done, per the reviewer's own suggested approach.
+
+**Tests required:** `tests/unit/test_automation_main_import.py` (rewritten, 3 tests: the original smoke-import test, a stronger assertion that the right submodules were resolved, and the direct collision reproduction above).
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20

@@ -1,8 +1,27 @@
 import configparser
-from variables import *
 from datetime import datetime, timedelta
 import traceback
 import os
+import importlib.util
+
+# projects/segments/scripts/query_orchestrator.py is a DIFFERENT file
+# that happens to share this exact name, and projects/segments/scripts/
+# get_segments_raw.py does a flat `import query_orchestrator` of its own
+# -- if that ran first in this process, Python's sys.modules cache would
+# make a plain `from variables import *` here silently resolve to
+# SEGMENTS' variables.py instead of this file's own (IH-047). Load this
+# file's own variables.py directly by path, under a private alias, the
+# same way projects/segments/scripts/*.py already load their own
+# variables.py, so this can never happen regardless of import order.
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_spec = importlib.util.spec_from_file_location(
+    "automation_variables_for_query_orchestrator", os.path.join(_script_dir, "variables.py")
+)
+_variables_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_variables_module)
+for _name in dir(_variables_module):
+    if not _name.startswith("_"):
+        globals()[_name] = getattr(_variables_module, _name)
 
 
 def run_query(query, bq_client):

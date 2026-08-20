@@ -6,7 +6,9 @@ Flask web application for managing campaigns
 import sys
 import os
 import json
+import hmac
 import traceback
+from functools import wraps
 from pathlib import Path
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
@@ -23,7 +25,72 @@ from shared.models.campaign import CampaignConfig, CustomSegment
 setup_shared_imports()
 
 app = Flask(__name__)
-app.secret_key = 'info-harbor-secret-key-2024'
+
+# IH-027: the Flask secret key (used for session signing -- flash()
+# messages ride on Flask's session cookie) must come from the
+# environment, never be hardcoded, and never fall back to a value
+# generated fresh on each process start (that would silently invalidate
+# every in-flight session/flash message on every restart, masking the
+# real problem: no key was configured). If this app is ever run without
+# INFO_HARBOR_FLASK_SECRET_KEY set, refuse to start rather than either
+# of those.
+FLASK_SECRET_KEY_ENV_VAR = "INFO_HARBOR_FLASK_SECRET_KEY"
+_flask_secret_key = os.environ.get(FLASK_SECRET_KEY_ENV_VAR)
+if not _flask_secret_key:
+    raise RuntimeError(
+        f"{FLASK_SECRET_KEY_ENV_VAR} is not set. This app uses Flask "
+        "sessions (flash() messages ride on the session cookie), so it "
+        "cannot start without a real secret key -- refusing to fall "
+        "back to a hardcoded value or a freshly-generated random one "
+        "(IH-027). Set it in the deployment environment before running "
+        "this app."
+    )
+app.secret_key = _flask_secret_key
+
+# IH-025: bearer-token auth for every state-changing route. Interim
+# internal-control mechanism -- see README.md for the operational note
+# and docs/code-audit.md IH-025 for the full route classification and
+# rationale.
+API_TOKEN_ENV_VAR = "INFO_HARBOR_API_TOKEN"
+
+
+def _get_expected_api_token():
+    # Read fresh on every request, not cached at import time, so a token
+    # set or rotated after the process starts is picked up without a
+    # restart.
+    return os.environ.get(API_TOKEN_ENV_VAR, "")
+
+
+def require_api_token(view_func):
+    """Require `Authorization: Bearer <token>` matching
+    INFO_HARBOR_API_TOKEN. Fails closed: if the env var is unset or
+    empty, every wrapped route rejects every request with 401 -- there
+    is no "no token configured, allow everything" fallback. Uses
+    hmac.compare_digest for the comparison. Never logs, echoes, or
+    otherwise reveals the configured or submitted token, and never
+    distinguishes "no token configured" from "wrong token supplied" in
+    the response, so the error itself can't be used to probe deployment
+    state.
+    """
+
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+        expected = _get_expected_api_token()
+        auth_header = request.headers.get("Authorization", "")
+
+        provided = None
+        if auth_header.startswith("Bearer "):
+            provided = auth_header[len("Bearer "):]
+
+        if not expected or not provided or not hmac.compare_digest(provided, expected):
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized: a valid Authorization: Bearer <token> header is required."
+            }), 401
+
+        return view_func(*args, **kwargs)
+
+    return wrapped
 
 def get_live_campaigns():
     """Get live campaigns from database"""
@@ -117,6 +184,7 @@ def campaign_detail(code):
         return redirect(url_for('index'))
 
 @app.route('/campaign/<code>/run/<action>', methods=['POST'])
+@require_api_token
 def run_campaign_action(code, action):
     """Run campaign actions (segments, tracker, etc.)"""
     try:
@@ -153,6 +221,7 @@ def run_campaign_action(code, action):
     return redirect(url_for('campaign_detail', code=code))
 
 @app.route('/api/campaign/<code>/run/<action>', methods=['POST'])
+@require_api_token
 def api_run_campaign_action(code, action):
     """API endpoint to run campaign actions (segments, tracker, etc.)"""
     try:
@@ -187,6 +256,7 @@ def api_run_campaign_action(code, action):
         return jsonify({'success': False, 'error': f'Error running {action} for campaign {code}: {str(e)}'}), 500
 
 @app.route('/api/run-all-trackers', methods=['POST'])
+@require_api_token
 def api_run_all_trackers():
     """API endpoint to run trackers for all campaigns"""
     try:
@@ -216,6 +286,7 @@ def api_run_all_trackers():
         return jsonify({'success': False, 'error': f'Error running all trackers: {str(e)}'}), 500
 
 @app.route('/api/campaigns/add', methods=['POST'])
+@require_api_token
 def api_add_campaign():
     """API endpoint to add new campaign to database"""
     try:
@@ -290,6 +361,7 @@ def api_add_campaign():
         return jsonify({'success': False, 'error': f'Error adding campaign: {str(e)}'}), 500
 
 @app.route('/automation', methods=['POST'])
+@require_api_token
 def run_automation():
     """Run automation process"""
     try:

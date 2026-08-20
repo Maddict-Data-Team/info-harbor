@@ -6,11 +6,25 @@ from datetime import datetime, timedelta
 from google.cloud import secretmanager
 import json
 import csv
+import os
+import importlib.util
 import requests
 from google.api_core.exceptions import Conflict
 
-
-from variables import *
+# See projects/automation/query_orchestrator.py's matching comment
+# (IH-047): loads this file's own variables.py by path under a private
+# alias, instead of a plain `from variables import *`, so it can never
+# silently resolve to projects/segments/scripts/variables.py (a
+# different file with the same name) depending on import order.
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_spec = importlib.util.spec_from_file_location(
+    "automation_variables_for_upload_backend", os.path.join(_script_dir, "variables.py")
+)
+_variables_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_variables_module)
+for _name in dir(_variables_module):
+    if not _name.startswith("_"):
+        globals()[_name] = getattr(_variables_module, _name)
 
 # Expected columns from schema (for validation)
 EXPECTED_COLS = [field.name for field in schema_back_end]

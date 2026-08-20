@@ -500,6 +500,116 @@ same month) is unaffected.
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-025 (interim bearer-token auth) and IH-027 (Flask secret key) fixed; IH-046 fixed
+
+**Goal:** Address IH-025 (Critical, previously top of the decision queue,
+escalated by the prior checkpoint's security review) as the highest-priority
+task, per an explicit, detailed, user-approved interim authentication
+design. IH-027 folded in as tightly related (same file, same category of
+Flask-security config).
+
+**Route enumeration and classification (done before implementation, per
+instruction):** all 13 routes in `ui/app.py` read and classified --
+5 state-changing (protected), 8 read-only (unchanged). Full table recorded
+in `docs/code-audit.md` IH-025. One judgment call flagged explicitly:
+`/api/refresh` is a POST route but performs no write of any kind (only
+re-reads live campaign data), classified read-only and locked in by a
+dedicated test so it isn't later assumed to be an oversight.
+
+**IH-025 fixed (interim control):**
+- `require_api_token` decorator + `_get_expected_api_token()` added to
+  `ui/app.py`, reading `INFO_HARBOR_API_TOKEN` fresh per request (not
+  cached at import), comparing via `hmac.compare_digest`, failing closed
+  (empty/unset env var -> every protected route always 401, never "auth
+  optional"), returning a fixed generic JSON 401 that never reveals
+  whether the env var exists or echoes any token value.
+- Applied to `run_campaign_action`, `api_run_campaign_action`,
+  `api_run_all_trackers`, `api_add_campaign`, `run_automation`.
+- No CORS added. No production route was run or accessed with real
+  credentials during implementation or testing.
+- **Known, deliberate consequence:** `run_campaign_action` and
+  `run_automation` are plain browser-`<form>` POST targets; browsers
+  cannot attach a custom `Authorization` header to a form submit, so
+  these two routes are now unreachable via their existing HTML forms
+  until a caller (curl, an operator tool, or an updated frontend)
+  supplies the token explicitly. Recorded as intentional, not
+  accidental breakage -- the frontend itself was not modified (out of
+  scope for this backend interim control).
+- Not implemented (explicitly out of scope, noted in the finding): CSRF
+  protection, a real identity provider, per-token rotation/revocation,
+  rate limiting.
+
+**IH-027 fixed:** `app.secret_key` now reads `INFO_HARBOR_FLASK_SECRET_KEY`;
+refuses to start (`RuntimeError` at import) if unset or empty, rather than
+falling back to the old hardcoded literal or generating a random key per
+process start (this app's `flash()` messages ride on the Flask session
+cookie, so a missing key isn't survivable either way -- fail loud, not
+silent).
+
+**IH-046 fixed (found while preparing tests for this checkpoint, same
+class as IH-014/IH-015):** `projects/automation/main.py` -- the module
+`ui/app.py`'s `/automation` route imports -- had the same missing-`sys.path`
+defect as IH-015: `import projects.automation.main` raised
+`ModuleNotFoundError: No module named 'upload_backend'`. This meant the
+`/automation` route (now newly protected) had never actually worked.
+Fixed with the same one-line pattern as IH-015.
+
+**Files changed:** `ui/app.py` (auth decorator, secret-key loading, 5
+route decorators), `projects/automation/main.py` (IH-046 sys.path fix),
+`tests/unit/test_ui_app_auth.py` (new, 24 tests), `tests/unit/test_automation_main_import.py`
+(new, 1 test), `docs/code-audit.md` (IH-025 rewritten with route table,
+IH-027 updated, new IH-046 entry), `README.md` (new environment-variable
+note).
+
+**Tests:** 24 new auth tests (every protected route x {no token, wrong
+token, valid token}, with the underlying operation mocked and asserted
+never-called / called accordingly; fail-closed behavior for both missing
+and empty `INFO_HARBOR_API_TOKEN`; a guard test that fails if a future
+write-method route isn't classified as protected or read-only) + 3 new
+IH-027 tests + 3 import tests (IH-045/IH-046/IH-047, one of which
+directly reproduces the collision the reviewer found), all offline, no
+credentials, no network -- every dangerous call in these tests is mocked
+before the request reaches it. Full suite:
+```
+python -m pytest -q
+# 97 passed
+```
+
+**Reviewer pass:** `security-parity-reviewer` run over this checkpoint's
+diff (pre-commit) only, per instruction. Verified clean: bearer-token
+comparison logic (no bypass via casing/prefix/empty-string edge cases),
+fail-closed behavior for both env vars, no token leakage anywhere, and
+the full 13-route classification (independently re-derived by the
+reviewer from the current route bodies, not taken on trust). One real
+finding: IH-046's `sys.path`-only fix left `projects/automation/main.py`'s
+flat imports order-dependent against `projects/segments/scripts/`'s
+same-named `query_orchestrator.py`/`variables.py` -- reproduced
+empirically, then fixed as **IH-047** (High): `main.py`,
+`query_orchestrator.py`, and `upload_backend.py` now all load their local
+dependencies via `importlib.util.spec_from_file_location` under private
+aliases, matching the pattern already used by
+`projects/segments/scripts/*.py` and IH-014's `get_campaign_tracker_main_new()`.
+`tests/unit/test_automation_main_import.py` extended from 1 test to 3,
+including a direct reproduction of the collision scenario.
+
+**Files changed (final, after the reviewer pass):** all of the above,
+plus `projects/automation/query_orchestrator.py`, `projects/automation/upload_backend.py`
+(IH-047).
+
+**Parity implications:** Behavior change is intentional and documented:
+unauthenticated requests to the 5 protected routes now get 401 instead of
+executing (this is the entire point of the fix). Read-only routes: zero
+change. `run_campaign_action`/`run_automation`'s existing HTML forms will
+now get a 401 JSON response until token support is added to the frontend
+or these are called with the header directly -- documented above and in
+`docs/code-audit.md`, not silently introduced.
+
+**Decision-queue status:** IH-025 and IH-027 removed from the queue
+(fixed). All other queue items unchanged; continuing to remaining
+unblocked findings after this checkpoint per instruction.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed
