@@ -71,7 +71,7 @@ validation" instead, however plausible it looks.
 | [IH-038](#ih-038) | `projects/poi/` was undocumented prior to this branch | Low | **Fixed** |
 | [IH-039](#ih-039) | `aaa` file may indicate repository/production drift | Medium | Needs Validation |
 | [IH-040](#ih-040) | Unexplained `keys/test-google-sheet.json` credential file | Low | Needs Validation |
-| [IH-041](#ih-041) | `/api/campaigns/add` reports success without persisting anything | Low | Needs Validation |
+| [IH-041](#ih-041) | `/api/campaigns/add` reports success without persisting anything | Low | **Fixed** |
 | [IH-042](#ih-042) | `.gitignore` fix revealed a previously-hidden, untracked, live-credential test script | Medium | Needs Validation |
 
 ---
@@ -1266,7 +1266,7 @@ now exits 1 (not ignored); before the fix it matched `test*` and exited 0 (ignor
 ### IH-041
 **Title:** `/api/campaigns/add` reports success without persisting anything
 **Severity:** Low
-**Status:** Needs Validation
+**Status:** Fixed
 **Date discovered:** 2026-08-19 -- new route on this branch
 
 **What is known:** `api_add_campaign()` validates the submitted campaign data via `CampaignConfig.validate()` and returns a JSON success response describing the "added" campaign, but the code contains an explicit `# TODO: Implement actual database save` comment and never writes anywhere.
@@ -1276,12 +1276,14 @@ now exits 1 (not ignored); before the fix it matched `test*` and exited 0 (ignor
 
 **What is NOT fully established:** Whether this is a known, intentional stub (e.g. UI development ahead of backend work) or a genuinely misleading response that could confuse an operator into believing a campaign was created. Filed as Needs Validation rather than a confirmed defect because the code's own comment suggests this is understood, in-progress work, not an oversight -- but it is still worth surfacing since the HTTP response gives no indication that nothing was saved.
 
-**Recommended correction:** Either implement the persistence, or change the response to make the stub status explicit (e.g. `"success": false, "error": "not yet implemented"`) until it does.
+**Recommended correction:** ~~Either implement the persistence, or change the response to make the stub status explicit~~ Done -- took the explicit-stub option (implementing real persistence is a production-write feature addition, out of scope here).
 
-**Tests required:** A test asserting the route's response accurately reflects whether persistence occurred, once implemented.
+**Fix applied:** `ui/app.py`'s `api_add_campaign()`: the response after the `# TODO: Implement actual database save` comment now returns `'success': False`, an `'error'` message explicitly stating persistence isn't implemented, `'campaign': {..., 'persisted': False}`, and HTTP 501. The existing frontend (`ui/templates/campaign_tracker.html:452-474`) already branches on `data.success` and surfaces `data.error` via its `else` path -- confirmed by reading that handler, no frontend change needed.
 
-**Branch/PR/commit that fixes it:** Not yet fixed.
-**Date resolved:** N/A
+**Tests required:** `tests/unit/test_ui_add_campaign_response.py` (new, 1 test) -- AST-based, does not import or run `ui/app.py`.
+
+**Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
+**Date resolved:** 2026-08-20
 
 ---
 

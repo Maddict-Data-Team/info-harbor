@@ -265,10 +265,14 @@ def api_add_campaign():
         # TODO: Implement actual database save
         # This would involve creating a new campaign configuration file
         # or inserting into the database
-        
+
+        # IH-041: persistence above is not implemented -- the response
+        # must say so rather than claiming success for something that
+        # didn't happen. 'campaign' is kept (validated, not persisted) so
+        # a caller can still see what would have been saved.
         return jsonify({
-            'success': True,
-            'message': f'Campaign {campaign_code} added successfully',
+            'success': False,
+            'error': f'Campaign {campaign_code} passed validation, but saving it is not yet implemented.',
             'campaign': {
                 'code': campaign_code,
                 'name': campaign_name,
@@ -276,9 +280,10 @@ def api_add_campaign():
                 'countries': new_campaign.countries,
                 'start_date': new_campaign.start_date,
                 'end_date': new_campaign.end_date,
-                'is_valid': True
+                'is_valid': True,
+                'persisted': False
             }
-        })
+        }), 501
         
     except Exception as e:
         print(f"Error details: {traceback.format_exc()}")

@@ -355,6 +355,35 @@ python -m pytest -q
 
 ---
 
+## 2026-08-20 — `feature/safety-test-baseline` — IH-041 fixed
+
+**Finding fixed:**
+- **IH-041** (Low) -- `/api/campaigns/add` validated the submitted
+  campaign, then returned `{'success': True, ...}` despite an explicit
+  `# TODO: Implement actual database save` immediately above it -- nothing
+  was ever persisted. Took the "make the stub explicit" option (not
+  "implement persistence", which is a production-write feature addition,
+  out of scope): now returns `success: False`, an explanatory `error`, HTTP
+  501, and `campaign.persisted: False`. Confirmed the existing frontend
+  handler already branches on `data.success` and surfaces `data.error`, so
+  no template change was needed.
+
+**Files changed:** `ui/app.py` (1 route's response), `tests/unit/test_ui_add_campaign_response.py`
+(new, 1 test, AST-based), `docs/code-audit.md`.
+
+**Tests:** focused (1) and full suite passing:
+```
+python -m pytest -q
+# 68 passed
+```
+
+**Parity implications:** Changes this route's HTTP status and response
+shape on every call (previously always "successful," now always explicit
+about not persisting). No UI/CLI/automation code path other than this one
+Flask route is affected.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-026 regression test added
 
 **Goal:** Close the one gap noted when IH-026 was fixed (no test existed
