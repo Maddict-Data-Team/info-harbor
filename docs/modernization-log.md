@@ -7,6 +7,50 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-08-21 — `fix/numpy-pandas-compat` — IH-049 fixed
+
+**Finding fixed:**
+- **IH-049** (Medium) -- neither `requirements.txt` nor
+  `projects/automation/requirements.txt` pinned `numpy`, so `pip install`
+  was free to resolve numpy 2.x alongside the pinned `pandas==2.1.1`, which
+  is built against numpy 1.x's ABI and fails at `import pandas`. This
+  formalizes, as a requirements-file fix, the same `numpy<2` workaround
+  `feature/safety-test-baseline`'s log entry already recorded as a local,
+  test-venv-only pin (see "Decisions and tradeoffs" further down this
+  file). Added `numpy==1.26.4` (the last numpy 1.x release) immediately
+  after the `pandas==2.1.1` line in both files. No application code or
+  deployment workflow was touched, per explicit scope.
+
+**Files changed:** `requirements.txt`, `projects/automation/requirements.txt`
+(1 line added to each), `tests/unit/test_requirements_numpy_pandas_compat.py`
+(new, 2 tests, static text checks only), `docs/code-audit.md` (IH-049 added).
+
+**Tests:** focused (2) and full offline suite passing; separately, in a
+fresh temporary Python 3.12 virtualenv created **outside this repository**
+(never committed, never touched by the offline suite's own `sys.path`/
+`conftest.py` guardrails):
+- `pip install -r requirements.txt` — clean
+- `pip install -r projects/automation/requirements.txt` — clean
+- `python -c "import numpy; import pandas"` — succeeds
+- `pip check` — no broken requirements
+- `python -m pytest -q` (offline suite, run against the temp venv's
+  interpreter) and `python -m compileall -q projects shared ui tests
+  campaign_manager.py` — both clean
+
+**Parity implications:** None -- dependency-pin-only change. No production
+code, deployment workflow, or GCP-facing behavior touched.
+
+**Not done, needs separate authorization:** `projects/automation/requirements.txt`
+is not currently part of the deployed Cloud Function artifact
+(`--source projects/automation` in `.github/workflows/deploy.yml` does not
+include `shared/`, and `projects/automation/variables.py` was **not**
+migrated to `shared/config/settings.py` for this reason — see the
+packaging decision note prepared alongside this branch). This fix keeps
+both requirements files internally consistent but does not itself change
+what Cloud Functions installs or resolve that separate packaging question.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-035 fixed (autonomous refinement continues)
 
 **Goal:** First checkpoint of the continued autonomous refinement pass,

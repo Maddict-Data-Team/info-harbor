@@ -8,6 +8,7 @@ google-cloud-secret-manager==2.18.3
 requests==2.31.0
 httplib2==0.22.0
 pandas==2.1.1
+numpy==1.26.4
 tqdm==4.65.0
 flask==3.0.0
 oauth2client==4.1.3

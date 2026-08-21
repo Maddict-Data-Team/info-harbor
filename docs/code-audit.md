@@ -1502,3 +1502,36 @@ python -m pytest tests/unit/test_automation_main_import.py -v
 
 **Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
 **Date resolved:** 2026-08-20
+
+---
+
+### IH-049
+**Title:** `numpy` unpinned in both requirements files, ABI-incompatible with pinned `pandas==2.1.1`
+
+**Severity:** Medium
+**Status:** Fixed
+**Date discovered:** 2026-08-21, while validating dependency installs for `feature/safety-test-baseline`'s test suite: installing `requirements.txt` / `projects/automation/requirements.txt` into a clean environment resolves numpy to the latest 2.x release, and `import pandas` then fails against pandas 2.1.1's compiled C extensions.
+
+**Business impact:** Any fresh install of either requirements file (a new contributor's machine, a rebuilt CI runner, or -- if `projects/automation`'s deployment packaging is ever changed to include this file, see the packaging note in `docs/modernization-log.md`) can silently resolve an incompatible numpy and fail at `import pandas` before any application code runs.
+
+**Technical explanation:** Neither `requirements.txt` nor `projects/automation/requirements.txt` pins `numpy`. Both pin `pandas==2.1.1`, a release built against numpy 1.x's ABI. `pip install` is free to resolve the newest compatible numpy release for any other pin, which today is numpy 2.x -- incompatible with pandas 2.1.1's compiled extensions (`ValueError: numpy.dtype size changed` / import-time `ImportError`, depending on the exact 2.x point release resolved).
+
+**Exact file and line evidence:**
+- `requirements.txt:10` -- `pandas==2.1.1`, no `numpy` pin anywhere in the file (before this fix)
+- `projects/automation/requirements.txt:11` -- `pandas==2.1.1`, no `numpy` pin anywhere in the file (before this fix)
+- `docs/modernization-log.md` (Decisions and tradeoffs, `feature/safety-test-baseline`) already records that the test-only virtualenv used for that branch's validation required manually pinning `numpy<2` to work around this same ABI mismatch -- this finding formalizes that as a requirements-file fix rather than a local workaround.
+
+**How to reproduce / verify safely:**
+```
+python -m pytest tests/unit/test_requirements_numpy_pandas_compat.py -v
+```
+Static text check of both files; does not install anything or import pandas/numpy. No network, no credentials.
+
+**Fix applied:** Added `numpy==1.26.4` immediately after the `pandas==2.1.1` line in both `requirements.txt` and `projects/automation/requirements.txt` -- the last numpy 1.x release, verified locally (in a temporary environment outside the repository) to install cleanly alongside `pandas==2.1.1` with a passing `import numpy; import pandas` and a clean `pip check`. No application code or deployment workflow was touched. Note: `projects/automation/requirements.txt` is not currently part of the deployed Cloud Function artifact for unrelated packaging reasons (`--source projects/automation` excludes `shared/`, per the open packaging question the current branch also surfaced); this fix keeps both requirements files internally consistent regardless of that separate, unresolved packaging question.
+
+**Recommended correction:** ~~Pin `numpy` to a 1.x release compatible with `pandas==2.1.1` in both requirements files~~ Done.
+
+**Tests required:** `tests/unit/test_requirements_numpy_pandas_compat.py` (new) -- static pin-compatibility check for both files.
+
+**Branch/PR/commit that fixes it:** `fix/numpy-pandas-compat` (based on `feature/safety-test-baseline` at `545852d`).
+**Date resolved:** 2026-08-21
