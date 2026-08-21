@@ -1537,7 +1537,11 @@ all copies in a single edit.
 **Exact file and line evidence:**
 - `projects/automation/variables.py:6-48,83-107`
 - `projects/campaign-tracker/variables.py:5-51`
-- `projects/segments/scripts/variables.py:5-49,92-112`
+- `projects/segments/scripts/variables.py:5-49,92-112` (original, pre-Phase-2d
+  evidence of the hardcoded copy this component used to carry; as of Phase
+  2d these values delegate to `shared/config/settings.py` -- see
+  `projects/segments/scripts/variables.py:1-120` for the current, migrated
+  content)
 - `projects/poi/variables.py:4-28`
 - `docs/modernization-spec.md:329-331` requires field-by-field proof before
   retiring the legacy copies.
@@ -1552,21 +1556,98 @@ client constructors remain blocked by `tests/conftest.py`.
 
 **Progress applied:** Added the side-effect-free
 `shared/config/settings.py` foundation with component-scoped views wherever
-the legacy values differ, plus six field-parity tests. No legacy entry point,
-query, schema, credential flow, or production module imports the new settings
-yet, so runtime behavior and output are unchanged. Per-campaign values such
-as campaign names and dates remain in `CampaignConfig`; they are user input,
-not global settings. Legacy key-file paths are represented only under
+the legacy values differ, plus six field-parity tests. Per-campaign values
+such as campaign names and dates remain in `CampaignConfig`; they are user
+input, not global settings. Legacy key-file paths are represented only under
 explicit `LEGACY_*` names and must not be used by new code.
+
+**Phase 2d (2026-08-21, `feature/segments-shared-config`, based directly on
+`feature/shared-config-foundation`, independent of the sibling
+`feature/poi-shared-config` and `feature/campaign-tracker-shared-config`
+branches that migrated their components the same way):**
+`projects/segments/scripts/variables.py`'s primitive/shared values (`project`,
+`dataset`, `dataset_LS`, `dataset_footfall`, `dataset_BERs`,
+`dataset_campaign_segments`, `dataset_metadata`, `dataset_HWG`,
+`table_placelift`, `table_HG`, `table_WG`, `table_hwg_pol_map`, `dir_data`,
+`key_bq`, `key_google_sheets`, `MAIN_DRIVE_FOLDER_ID`,
+`drive_link_folder_Adops`, `table_mapping`, `static_query_replace`,
+`poi_filter_fields`, `secret_ber`, `secret_bq`) now delegate to
+`shared/config/settings.py`. `schema_DID`, `schema_back_end`, and
+`schema_Combined` (structural BigQuery schemas) are unchanged.
+
+**This file has real, active callers -- unlike Phase 2b (POI) and Phase 2c
+(Campaign Tracker's legacy path only), the values and behavior of every
+caller remain identical; only where the primitive values are sourced from
+changes.** `main.py` (7 of 8 named callers reachable transitively:
+`reset_folders`, `get_segments_raw`, `split_segments`, `transfer_to_drive`,
+`push_to_bq`, `authenticate_to_cloud`, `create_be_table`, plus
+`query_orchestrator.py` pulled in internally by `get_segments_raw.py`),
+`main_new.py` (the same 7 via dotted imports, wired into `ui/app.py` and
+`campaign_manager.py`), and `delete_from_drive.py` (not reachable via
+either entry point -- a deliberately standalone script per IH-028,
+verified separately) all confirmed to import correctly, unchanged, after
+this migration. `main.py`, `main_new.py`, `input.py`, every worker script,
+`ui/app.py`, `campaign_manager.py`, and `queries.ini` are all unmodified.
+`main.py` is **not** classified as dead code -- it remains a potentially
+manually invoked production-write script.
+
+**IH-001 (wrong-campaign global override, still Open) deliberately not
+touched:** this migration only changes where `query_orchestrator.py`'s
+imported constants come from, not `build_query()`'s own logic (the actual
+site of IH-001's bug, which still reads the module-level `code_name`
+global instead of its `codename` parameter). Confirmed by running
+`tests/unit/test_segments_wrong_campaign_global.py` unchanged and still
+passing (i.e. the bug still reproduces exactly as before) as part of the
+full suite.
+
+**Import-safety fix required for the migration to be safe (found and fixed
+proactively, same class of issue as Phases 2b and 2c):**
+`projects/segments/scripts/variables.py` had no `sys.path` handling of its
+own. It's loaded two different ways across its callers -- a flat `from
+variables import *` (`split_segments.py`, `create_be_table.py`) and
+`importlib.util.spec_from_file_location` under alias `"variables_local"`
+(`get_segments_raw.py`, `query_orchestrator.py`, `authenticate_to_cloud.py`,
+`transfer_to_drive.py`, `push_to_bq.py`, `delete_from_drive.py`) -- neither
+of which puts the repository root on `sys.path`. Fixed the same way as
+Phases 2b/2c: `variables.py` computes the repository root from its own
+`__file__` and inserts it into `sys.path` before importing
+`shared.config.settings`, verified to work for both loading styles.
+
+**Test-isolation bug found and fixed during this migration's own test
+development (not present in the shipped file, caught before commit):** an
+early version of the new flat-import-style regression test did not guard
+against `sys.modules['variables']` already being populated by an earlier
+test in the same full-suite run -- `projects/poi/main.py` also does a flat
+`from variables import *`, so running the POI smoke-import test before this
+one left POI's `variables.py` cached under the plain name `'variables'`,
+which the new test's own `exec("from variables import *", ...)` then
+silently reused (the exact class of collision as IH-047, between POI and
+Segments this time instead of Automation and Segments). Fixed by having the
+test explicitly clear and restore `sys.modules['variables']` around itself.
 
 **Recommended correction:** Migrate one entry point at a time to delegate to
 the shared settings, preserving its scoped values and passing both the full
-offline suite and output-parity checks. Remove a legacy `variables.py` or
-`input.py` only after its manual callers are confirmed and parity is proven.
-Migrate authentication separately under IH-029.
+offline suite and output-parity checks (done for `projects/poi/variables.py`
+in Phase 2b, `projects/campaign-tracker/variables.py` in Phase 2c, and
+`projects/segments/scripts/variables.py` in Phase 2d). Remove a legacy
+`variables.py` or `input.py` only after its manual callers are confirmed and
+parity is proven. Migrate authentication separately under IH-029.
 
-**Tests required:** `tests/unit/test_shared_config_settings.py` (6 tests),
-plus the full offline suite on every consuming migration.
+**Tests required:** `tests/unit/test_shared_config_settings.py` (6 tests,
+foundation parity); `tests/unit/test_poi_variables_shared_config.py` (8
+tests, Phase 2b); `tests/unit/test_campaign_tracker_variables_shared_config.py`
+(13 tests, Phase 2c); `tests/unit/test_segments_variables_shared_config.py`
+(16 tests, Phase 2d: value parity including the 7-country vs. 8-country
+table-mapping distinction and the segments-vs-tracker Drive-URL
+distinction, all three schemas unchanged field-by-field, both loading
+styles verified in isolation, and subprocess-based real-invocation-shape
+tests for `main.py`, `main_new.py`, and `delete_from_drive.py` across
+`cwd=repo_root`/`cwd=projects/segments`/`cwd=projects/segments/scripts` --
+without calling any operational function). Plus the full offline suite on
+every consuming migration.
 
 **Branch/PR/commit that progresses it:** `feature/shared-config-foundation`
-(uncommitted working tree pending review).
+(foundation, commit `8f35462`); `feature/poi-shared-config` (Phase 2b, POI
+migrated); `feature/campaign-tracker-shared-config` (Phase 2c, Campaign
+Tracker migrated); `feature/segments-shared-config` (Phase 2d, Segments
+migrated).

@@ -7,6 +7,133 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-08-21 — `feature/segments-shared-config` — Phase 2d: Segments migrated to shared settings
+
+**Goal:** Migrate `projects/segments/scripts/variables.py` to consume
+`shared/config/settings.py`, based directly on
+`feature/shared-config-foundation`@`8f35462` -- deliberately independent
+of the sibling `feature/poi-shared-config` and
+`feature/campaign-tracker-shared-config` branches, so each migration
+stays separately reviewable and revertible.
+
+**Finding progressed:**
+- **IH-048** -- `projects/segments/scripts/variables.py`'s primitive and
+  shared values (`project`, `dataset`, `dataset_LS`, `dataset_footfall`,
+  `dataset_BERs`, `dataset_campaign_segments`, `dataset_metadata`,
+  `dataset_HWG`, `table_placelift`, `table_HG`, `table_WG`,
+  `table_hwg_pol_map`, `dir_data`, `key_bq`, `key_google_sheets`,
+  `MAIN_DRIVE_FOLDER_ID`, `drive_link_folder_Adops`, `table_mapping`,
+  `static_query_replace`, `poi_filter_fields`, `secret_ber`, `secret_bq`)
+  now delegate to `shared/config/settings.py`. `schema_DID`,
+  `schema_back_end`, and `schema_Combined` are untouched.
+
+**Explicitly stated, per instruction: this file has active callers, and
+its values and behavior remain identical -- only where the primitive
+values are sourced from changes.** `main.py`, `main_new.py`, `input.py`,
+every worker script (`split_segments.py`, `create_be_table.py`,
+`get_segments_raw.py`, `query_orchestrator.py`, `authenticate_to_cloud.py`,
+`transfer_to_drive.py`, `push_to_bq.py`, `delete_from_drive.py`),
+`ui/app.py`, `campaign_manager.py`, and `queries.ini` are all unmodified.
+`main.py` is not classified as dead code -- it remains a potentially
+manually invoked production-write script.
+
+**IH-001 deliberately not touched or fixed alongside this migration,**
+per instruction: `query_orchestrator.py`'s `build_query()` still reads
+the module-level `code_name` global instead of its `codename` parameter,
+unchanged. Confirmed by running `tests/unit/test_segments_wrong_campaign_global.py`
+as part of the full suite -- it still passes, meaning the bug still
+reproduces exactly as before.
+
+**Import-safety fix required for the migration to be safe (found and
+fixed proactively, same class of issue as Phases 2b and 2c):**
+`variables.py` had no `sys.path` handling of its own, and is loaded two
+different ways across its 8 callers -- a flat `from variables import *`
+(`split_segments.py`, `create_be_table.py`) and
+`importlib.util.spec_from_file_location` under alias `"variables_local"`
+(the other 6) -- neither of which puts the repository root on
+`sys.path`. Fixed identically to Phases 2b/2c: compute the repository
+root from `variables.py`'s own `__file__` and insert it into `sys.path`
+before importing `shared.config.settings`; verified to work for both
+loading styles, tested in isolation.
+
+**Test-isolation bug found and fixed during this migration's own test
+development, before it reached the committed state:** an early version
+of the new flat-import-style test didn't guard against
+`sys.modules['variables']` already being populated by an earlier test in
+the same full-suite run. `projects/poi/main.py` also does a flat `from
+variables import *`, so running the POI smoke-import test first left
+POI's `variables.py` (`dataset_metadata = "Lookups"`) cached under the
+plain name `'variables'`, which this migration's own test then silently
+reused instead of resolving segments' real file -- reproduced concretely:
+`python -m pytest -q` (full suite) failed this one test with `assert
+'Lookups' == 'Metadata'`, while running the same test file in isolation
+passed cleanly. This is the same class of collision as IH-047 (Automation
+vs. Segments), here between POI and Segments. Fixed by having the test
+explicitly pop and restore `sys.modules['variables']` around itself;
+re-ran the full suite three times (including with the POI test file
+immediately preceding this one) to confirm the fix holds under adversarial
+ordering, not just by chance.
+
+**Files changed:** `projects/segments/scripts/variables.py` (migrated),
+`tests/unit/test_segments_variables_shared_config.py` (new, 16 tests),
+`docs/code-audit.md` (IH-048), `docs/modernization-log.md` (this entry).
+
+**Tests:**
+```
+python -m pytest -q tests/unit/test_segments_variables_shared_config.py
+# 16 passed
+
+python -m pytest -q
+# 119 passed (run three times to confirm order-independence)
+
+python -m compileall -q projects shared ui tests campaign_manager.py
+# clean
+
+git diff --check
+# clean
+```
+
+Verification covered every named caller: `main.py`'s real import
+sequence (transitively exercises `reset_folders`, `get_segments_raw`,
+`split_segments`, `transfer_to_drive`, `push_to_bq`,
+`authenticate_to_cloud`, `create_be_table`, and `query_orchestrator.py`
+via `get_segments_raw.py`'s own internal import) across
+`cwd=repo_root`/`cwd=projects/segments`/`cwd=projects/segments/scripts`;
+`main_new.py` the same way via its dotted imports; `delete_from_drive.py`
+verified standalone (the one caller not reachable via either entry
+point, per IH-028) across all three `cwd` scenarios; and both loading
+styles (`from variables import *` and `spec_from_file_location`)
+verified in isolation, independent of any specific caller file. No test
+calls `main()`, `create_client()`, `split_files()`,
+`transfer_files_to_drive()`, `run_push_to_bq()`,
+`authenticate_get_clients()`, `create_BER_Table()`, `reset_folders()`,
+`get_raw_segments()`, or anything in `delete_from_drive.py`.
+
+**Parity implications:** None to output, credential handling, or IH-001's
+existing (still-open) bug. Every delegated value verified byte-identical
+to what `projects/segments/scripts/variables.py` hardcoded before this
+change, including the segments-specific 7-country POI table mapping (no
+`MAR`, distinct from Campaign Tracker/POI's 8) and the segments/AdOps
+Drive URL (distinct from Campaign Tracker's separate legacy URL, verified
+by an explicit inequality assertion). `table_mapping` and
+`static_query_replace` are explicitly kept as plain mutable `dict`s (not
+`shared/config/settings.py`'s read-only `MappingProxyType` views);
+`poi_filter_fields` stays a `list` (not the settings module's `tuple`).
+
+**Next recommended component:** `projects/automation/variables.py` -- the
+only remaining component, and the only one that's currently *deployed*
+(the Cloud Function). Should be migrated last among the four, now that
+the pattern (repo-root-from-`__file__` sys.path handling, value/type
+parity tests, subprocess-based real-invocation-shape verification, and
+explicit test-isolation discipline against the flat-import collision
+class) has been proven safe on POI, Campaign Tracker, and Segments.
+`projects/automation/query_orchestrator.py` and `upload_backend.py`
+already load their own `variables.py` via
+`importlib.util.spec_from_file_location` (IH-047), which should make this
+migration more mechanical than segments' was.
+
+---
+
 ## 2026-08-21 — `feature/shared-config-foundation` — IH-048 foundation added
 
 **Goal:** Start Phase 2 with a side-effect-free, additive settings source

@@ -1,52 +1,66 @@
+import os
+import sys
+
 from google.cloud import bigquery
+
+# This file is loaded two different ways across projects/segments/scripts/:
+#   - a flat `from variables import *` (split_segments.py, create_be_table.py)
+#   - importlib.util.spec_from_file_location under alias "variables_local"
+#     (get_segments_raw.py, query_orchestrator.py, authenticate_to_cloud.py,
+#     transfer_to_drive.py, push_to_bq.py, delete_from_drive.py)
+# Neither loading style puts the repository root on sys.path, and this
+# file's own directory is the only thing guaranteed to be reachable (a
+# direct script run puts the invoked script's own directory on sys.path;
+# spec_from_file_location doesn't touch sys.path at all). The shared
+# settings module lives outside this directory, so it must be reachable
+# regardless of the caller's working directory or which of the two
+# loading styles is used. Computed from this file's own __file__, not
+# inherited from a caller-provided sys.path or cwd -- same fix, same
+# reasoning, as projects/poi/variables.py (Phase 2b) and
+# projects/campaign-tracker/variables.py (Phase 2c).
+_repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
+from shared.config import settings
 
 # Dictionaries
 
-table_mapping = {
-    "KSA": "POI_DB_KSA",
-    "UAE": "POI_DB_UAE",
-    "QAT": "POI_DB_QTR",
-    "KWT": "POI_DB_KWT",
-    "OMN": "POI_DB_OMN",
-    "BHR": "POI_DB_BHR",
-    "EGY": "POI_DB_EGP",
-}
+table_mapping = dict(settings.SEGMENTS_COUNTRY_POI_TABLES)
 
 # Folders
 
-project = "maddictdata"
-dataset = "Back_End_Reports"
-dir_data = "projects/segments/data"
+project = settings.PROJECT_ID
+dataset = settings.DATASET_BACKEND_REPORTS
+dir_data = settings.SEGMENTS_DATA_DIR
 
 # Keys
 
-key_bq = "keys/maddictdata-bq.json"
-key_google_sheets = "keys/maddictdata-google-sheets.json"
+key_bq = settings.LEGACY_BIGQUERY_KEY_PATH
+key_google_sheets = settings.LEGACY_GOOGLE_SHEETS_KEY_PATH
 
 # Folders
 
-MAIN_DRIVE_FOLDER_ID = "1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf"
+MAIN_DRIVE_FOLDER_ID = settings.DRIVE_MAIN_FOLDER_ID
 
-drive_link_folder_Adops = (
-    "https://drive.google.com/drive/folders/1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf"
-)
+drive_link_folder_Adops = settings.DRIVE_ADOPS_FOLDER_URL
 # https://drive.google.com/drive/u/0/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM https://drive.google.com/drive/u/0/folders/1HEJQ-0gc8VgICB6NK2yZO-aBweuTVrRf
 # Table
 
-table_placelift = "Placelift"
+table_placelift = settings.TABLE_PLACELIFT
 
 # BQ Datasets
 
-dataset_LS = "Location_Signals"
-dataset_footfall = "Back_End_Footfall"
-dataset_BERs = "Back_End_Reports"
-dataset_campaign_segments = "Placelift_Campaign_Segments"
-dataset_metadata = "Metadata"
+dataset_LS = settings.DATASET_LOCATION_SIGNALS
+dataset_footfall = settings.DATASET_FOOTFALL
+dataset_BERs = settings.DATASET_BACKEND_REPORTS
+dataset_campaign_segments = settings.DATASET_CAMPAIGN_SEGMENTS
+dataset_metadata = settings.DATASET_METADATA
 
-dataset_HWG = "Automated_HWG"
-table_HG = "Home_Graph_Cumulative"
-table_WG = "Work_Graph_Cumulative"
-table_hwg_pol_map = "All_Pols_Mapping"
+dataset_HWG = settings.DATASET_AUTOMATED_HWG
+table_HG = settings.TABLE_HOME_GRAPH
+table_WG = settings.TABLE_WORK_GRAPH
+table_hwg_pol_map = settings.TABLE_HWG_POL_MAPPING
 # BQ Schemas
 
 schema_DID = [bigquery.SchemaField("DID", "STRING")]
@@ -99,14 +113,8 @@ static_query_replace = {
     "{pol_map_table}": table_hwg_pol_map,
 }
 
-poi_filter_fields = [
-    "General_Category",
-    "Category",
-    "Subcategory",
-    "GM_Subcategory",
-    "Chain",
-]
+poi_filter_fields = list(settings.POI_FILTER_FIELDS)
 
 
-secret_ber = f"projects/maddictdata/secrets/token-ber/versions/latest"
-secret_bq = f"projects/maddictdata/secrets/secret-bq/versions/latest"
+secret_ber = settings.SECRET_BACKEND_REPORT_TOKEN
+secret_bq = settings.SECRET_BIGQUERY_CREDENTIALS
