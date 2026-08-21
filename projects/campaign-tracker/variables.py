@@ -1,54 +1,67 @@
+import os
+import sys
+
 from google.cloud import bigquery
+
+# projects/campaign-tracker/main.py loads this file as a flat,
+# unqualified `from variables import *`, with no other sys.path setup
+# of its own -- it relies entirely on however Python itself was invoked
+# (a direct script run puts this file's own directory on sys.path,
+# nothing more). The shared settings module below lives outside that
+# directory, so it must be reachable regardless of the caller's working
+# directory. Computed from this file's own location, not inherited from
+# a caller-provided sys.path or cwd -- same fix, same reasoning, as
+# projects/poi/variables.py's IH-048 migration: relying on cwd alone
+# breaks when invoked as `cd projects/campaign-tracker && python
+# main.py`, a plausible real invocation pattern. main_new.py does not
+# import this file at all (confirmed: it uses shared/config/campaigns
+# directly), so this only affects the legacy main.py path.
+_repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
+from shared.config import settings
 
 # Metadata Status
 
-stage_0 = "Pre-Validation"
-stage_1 = "Validation"
-stage_2 = "Active"
-stage_3 = "Completion Period"
-stage_4 = "Finished"
+stage_0 = settings.STATUS_PRE_VALIDATION
+stage_1 = settings.STATUS_VALIDATION
+stage_2 = settings.STATUS_ACTIVE
+stage_3 = settings.STATUS_COMPLETION_PERIOD
+stage_4 = settings.STATUS_FINISHED
 
 # Dictionaries
 
-table_mapping = {
-    "KSA": "POI_DB_KSA",
-    "UAE": "POI_DB_UAE",
-    "QAT": "POI_DB_QTR",
-    "KWT": "POI_DB_KWT",
-    "OMN": "POI_DB_OMN",
-    "BHR": "POI_DB_BHR",
-    "EGY": "POI_DB_EGP",
-    "MAR": "POI_DB_MAR",
-
-}
+table_mapping = dict(settings.CAMPAIGN_TRACKER_COUNTRY_POI_TABLES)
 
 # Folders
 
-project = "maddictdata"
-dataset = "Back_End_Reports"
-dir_data = "data"
+project = settings.PROJECT_ID
+dataset = settings.DATASET_BACKEND_REPORTS
+dir_data = settings.CAMPAIGN_TRACKER_DATA_DIR
 
 # Keys
 
-key_bq = "keys/maddictdata-bq.json"
-key_google_sheets = "keys/maddictdata-google-sheets.json"
+key_bq = settings.LEGACY_BIGQUERY_KEY_PATH
+key_google_sheets = settings.LEGACY_GOOGLE_SHEETS_KEY_PATH
 
-drive_link_folder_Adops = (
-    "https://drive.google.com/drive/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM"
-)
+# Campaign Tracker's own Drive folder is a different, legacy location
+# from the Segments/AdOps one -- deliberately kept distinct, not
+# collapsed into the shared DRIVE_ADOPS_FOLDER_URL.
+drive_link_folder_Adops = settings.LEGACY_CAMPAIGN_TRACKER_DRIVE_FOLDER_URL
 #https://drive.google.com/drive/u/0/folders/1GuOSGxq5AlLxzaqbkzQBDQ8n7HcuhWWM
 # Table
 
-tbl_campaign_tracker = 'Campaign_Tracker'
+tbl_campaign_tracker = settings.TABLE_CAMPAIGN_TRACKER
 #'Campaign_Tracker'
 # BQ Datasets
 # 'test'
 
-dataset_LS = "Location_Signals"
-dataset_footfall = "Back_End_Footfall"
-dataset_BERs = "Back_End_Reports"
-dataset_campaign_segments = "Placelift_Campaign_Segments"
-dataset_metadata = 'Metadata'
+dataset_LS = settings.DATASET_LOCATION_SIGNALS
+dataset_footfall = settings.DATASET_FOOTFALL
+dataset_BERs = settings.DATASET_BACKEND_REPORTS
+dataset_campaign_segments = settings.DATASET_CAMPAIGN_SEGMENTS
+dataset_metadata = settings.DATASET_METADATA
 
 #BQ Schemas
 

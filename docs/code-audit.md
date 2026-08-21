@@ -1536,7 +1536,11 @@ all copies in a single edit.
 
 **Exact file and line evidence:**
 - `projects/automation/variables.py:6-48,83-107`
-- `projects/campaign-tracker/variables.py:5-51`
+- `projects/campaign-tracker/variables.py:5-51` (original, pre-Phase-2c
+  evidence of the hardcoded copy this component used to carry; as of Phase
+  2c these values delegate to `shared/config/settings.py` -- see
+  `projects/campaign-tracker/variables.py:1-64` for the current, migrated
+  content)
 - `projects/segments/scripts/variables.py:5-49,92-112`
 - `projects/poi/variables.py:4-28`
 - `docs/modernization-spec.md:329-331` requires field-by-field proof before
@@ -1552,21 +1556,60 @@ client constructors remain blocked by `tests/conftest.py`.
 
 **Progress applied:** Added the side-effect-free
 `shared/config/settings.py` foundation with component-scoped views wherever
-the legacy values differ, plus six field-parity tests. No legacy entry point,
-query, schema, credential flow, or production module imports the new settings
-yet, so runtime behavior and output are unchanged. Per-campaign values such
-as campaign names and dates remain in `CampaignConfig`; they are user input,
-not global settings. Legacy key-file paths are represented only under
+the legacy values differ, plus six field-parity tests. Per-campaign values
+such as campaign names and dates remain in `CampaignConfig`; they are user
+input, not global settings. Legacy key-file paths are represented only under
 explicit `LEGACY_*` names and must not be used by new code.
+
+**Phase 2c (2026-08-21, `feature/campaign-tracker-shared-config`, based
+directly on `feature/shared-config-foundation`, independent of the sibling
+`feature/poi-shared-config` branch that migrated POI the same way):**
+`projects/campaign-tracker/variables.py`'s primitive values (`stage_0`
+through `stage_4`, `project`, `dataset`, `dataset_LS`, `dataset_footfall`,
+`dataset_BERs`, `dataset_campaign_segments`, `dataset_metadata`,
+`table_mapping`, `dir_data`, `key_bq`, `key_google_sheets`,
+`drive_link_folder_Adops`, `tbl_campaign_tracker`) now delegate to
+`shared/config/settings.py`. `schema_DID`, `schema_back_end`, and
+`schema_Combined` (structural BigQuery schemas, not primitive settings) are
+unchanged. `main.py`, `main_new.py`, `input.py`, `ui/app.py`, and
+`campaign_manager.py` are all unmodified -- confirmed by source inspection
+that `main_new.py` does not import `variables.py` at all (it sources
+configuration from `shared/config/campaigns` directly), so this migration
+only affects the legacy `main.py` path. `main.py` remains a potentially
+manually invoked production-write script; not classified as dead code, and
+not removed or renamed.
+
+**Import-safety fix required for the migration to be safe (found and fixed
+proactively, same class of issue as Phase 2b's POI migration):**
+`projects/campaign-tracker/variables.py` had no `sys.path` handling of its
+own, and `main.py` loads it as a flat `from variables import *`. A naive
+`from shared.config import settings` would break whenever invoked with a
+working directory other than the repository root. `variables.py` now
+computes the repository root from its own `__file__` and inserts it into
+`sys.path` before importing `shared.config.settings`, matching the pattern
+already used by `projects/poi/variables.py` (Phase 2b) and
+`projects/campaign-tracker/main_new.py` itself.
 
 **Recommended correction:** Migrate one entry point at a time to delegate to
 the shared settings, preserving its scoped values and passing both the full
-offline suite and output-parity checks. Remove a legacy `variables.py` or
-`input.py` only after its manual callers are confirmed and parity is proven.
-Migrate authentication separately under IH-029.
+offline suite and output-parity checks (done for `projects/poi/variables.py`
+in Phase 2b and `projects/campaign-tracker/variables.py` in Phase 2c).
+Remove a legacy `variables.py` or `input.py` only after its manual callers
+are confirmed and parity is proven. Migrate authentication separately under
+IH-029.
 
-**Tests required:** `tests/unit/test_shared_config_settings.py` (6 tests),
-plus the full offline suite on every consuming migration.
+**Tests required:** `tests/unit/test_shared_config_settings.py` (6 tests,
+foundation parity); `tests/unit/test_poi_variables_shared_config.py` (8
+tests, Phase 2b); `tests/unit/test_campaign_tracker_variables_shared_config.py`
+(13 tests, Phase 2c: value parity including the distinct legacy Drive URL,
+`table_mapping` type/mutability preservation, all three schema lists
+unchanged, confirmation `main_new.py` does not import `variables.py`, and
+three real-subprocess tests reproducing `main.py`'s exact `sys.path` shape
+from both `cwd=repo_root` and `cwd=projects/campaign-tracker` -- without
+calling `main()`, `create_client()`, or `metadata_placelift()`). Plus the
+full offline suite on every consuming migration.
 
 **Branch/PR/commit that progresses it:** `feature/shared-config-foundation`
-(uncommitted working tree pending review).
+(foundation, commit `8f35462`); `feature/poi-shared-config` (Phase 2b, POI
+migrated); `feature/campaign-tracker-shared-config` (Phase 2c, Campaign
+Tracker migrated).

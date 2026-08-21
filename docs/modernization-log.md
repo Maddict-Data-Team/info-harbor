@@ -7,6 +7,102 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-08-21 — `feature/campaign-tracker-shared-config` — Phase 2c: Campaign Tracker migrated to shared settings
+
+**Goal:** Migrate `projects/campaign-tracker/variables.py` to consume
+`shared/config/settings.py`, based directly on
+`feature/shared-config-foundation`@`8f35462` -- deliberately independent
+of the sibling `feature/poi-shared-config` branch (Phase 2b), so the two
+migrations stay separately reviewable and revertible.
+
+**Finding progressed:**
+- **IH-048** -- `projects/campaign-tracker/variables.py`'s primitive
+  values (`stage_0`-`stage_4`, `project`, `dataset`, `dataset_LS`,
+  `dataset_footfall`, `dataset_BERs`, `dataset_campaign_segments`,
+  `dataset_metadata`, `table_mapping`, `dir_data`, `key_bq`,
+  `key_google_sheets`, `drive_link_folder_Adops`,
+  `tbl_campaign_tracker`) now delegate to `shared/config/settings.py`
+  instead of hardcoding their own copies. `schema_DID`,
+  `schema_back_end`, and `schema_Combined` are untouched.
+  `main.py`/`main_new.py`/`input.py`/`ui/app.py`/`campaign_manager.py`
+  are all unmodified.
+
+**Confirmed `main_new.py` is unaffected:** read its source directly --
+it imports configuration from `shared/config/campaigns` and
+`shared/utils/compatibility`, never `from variables import *` or
+`import variables`. This migration only touches the legacy `main.py`
+path. `main.py` is **not** classified as dead code -- it remains a
+potentially manually invoked production-write script, per instruction.
+
+**Import-safety issue found and fixed proactively (same class as Phase
+2b's POI fix, applied before it could break anything, not discovered by
+a failure this time):** `projects/campaign-tracker/variables.py` had no
+`sys.path` handling of its own; `main.py` loads it as a flat `from
+variables import *`, relying entirely on whatever `sys.path` Python
+already has at invocation time. Empirically confirmed the baseline (a
+real subprocess with `sys.path=[projects/campaign-tracker/]`) works
+today from both `cwd=repo_root` and `cwd=projects/campaign-tracker`
+(Python's own script-directory rule covers `variables`/`input`, both
+local to that directory) -- then confirmed a naive `from shared.config
+import settings` would still be `cwd`-dependent the same way POI's was
+before its own fix, so applied the identical guard: compute the
+repository root from `variables.py`'s own `__file__` and insert it into
+`sys.path` before importing `shared.config.settings`.
+
+**Files changed:** `projects/campaign-tracker/variables.py` (migrated),
+`tests/unit/test_campaign_tracker_variables_shared_config.py` (new, 13
+tests), `docs/code-audit.md` (IH-048), `docs/modernization-log.md` (this
+entry).
+
+**Tests:**
+```
+python -m pytest -q tests/unit/test_campaign_tracker_variables_shared_config.py
+# 13 passed
+
+python -m pytest -q
+# 116 passed
+
+python -m compileall -q projects shared ui tests campaign_manager.py
+# clean
+
+git diff --check
+# clean (no whitespace-check workaround needed this time)
+```
+
+Three of the thirteen new tests spawn real, separate subprocesses (not
+reproducible from inside the pytest process itself, for the same reason
+documented in Phase 2b's log entry) with only
+`projects/campaign-tracker/` on `sys.path`, confirming
+`variables`/`main` import correctly from both `cwd=repo_root` and
+`cwd=projects/campaign-tracker`. Neither calls `main()`,
+`create_client()`, or `metadata_placelift()` (would construct a real
+BigQuery client); `variables.py` itself only imports `bigquery` for
+`SchemaField` objects, never a client.
+
+**Parity implications:** None to output or credential handling. Every
+delegated value is byte-identical to what
+`projects/campaign-tracker/variables.py` hardcoded before this change,
+including the intentionally-distinct legacy Campaign Tracker Drive
+folder URL (kept separate from the shared `DRIVE_ADOPS_FOLDER_URL`, not
+collapsed into it -- verified by an explicit test asserting
+inequality). `table_mapping` is explicitly kept as a plain mutable
+`dict` (not the read-only `MappingProxyType`
+`shared/config/settings.py` exposes), matching the legacy value's exact
+type and mutability.
+
+**Next recommended component:** `projects/segments/scripts/variables.py`
+and/or `projects/automation/variables.py`. Segments has more real
+callers (`main_new.py`, wired into `ui/app.py` and
+`campaign_manager.py`) than either POI or Campaign Tracker's legacy
+path did, so it carries materially more output-parity risk -- worth
+re-confirming the decision-queue items in `docs/refinement-review.md`
+are still current before starting it. Automation is the only currently
+*deployed* component and should be migrated last among the four,
+after the pattern has been proven safe on the three lower-stakes
+components.
+
+---
+
 ## 2026-08-21 — `feature/shared-config-foundation` — IH-048 foundation added
 
 **Goal:** Start Phase 2 with a side-effect-free, additive settings source
