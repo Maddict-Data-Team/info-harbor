@@ -7,6 +7,44 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-08-21 — `feature/shared-config-foundation` — IH-048 foundation added
+
+**Goal:** Start Phase 2 with a side-effect-free, additive settings source
+before migrating any production or manual entry point.
+
+**Finding progressed:**
+- **IH-048** (Medium) -- the four project areas contain divergent copies of
+  project, dataset, table, country, Drive, status, secret-resource, legacy-key
+  path, default, and query-placeholder settings. Added one shared source while
+  preserving intentional component differences as explicit scoped views.
+
+**Files changed:** `shared/config/settings.py` (new),
+`tests/unit/test_shared_config_settings.py` (new), `docs/code-audit.md`,
+`docs/modernization-log.md`, and `README.md`.
+
+**Tests:**
+```
+python -m pytest -q tests/unit/test_shared_config_settings.py
+# 6 passed
+
+python -m pytest -q
+# 103 passed, 17 warnings
+```
+
+**Parity implications:** None. No existing entry point imports the new module;
+no legacy config, query, schema, credential flow, output path, deployment file,
+or BigQuery/Drive behavior changed. The parity tests compare the new values
+against the real legacy modules and retain separate views where existing
+components differ.
+
+**Design note:** The new module is `shared/config/settings.py`, matching the
+target shape in `docs/modernization-spec.md`, rather than extending the unused
+`base_config.py`. Importing `base_config.py` imports `paths.py`, whose module
+body creates directories and checks legacy key-file locations. New shared
+settings must be safe to import without filesystem or credential side effects.
+
+---
+
 ## 2026-08-20 — `feature/safety-test-baseline` — IH-035 fixed (autonomous refinement continues)
 
 **Goal:** First checkpoint of the continued autonomous refinement pass,

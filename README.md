@@ -49,16 +49,17 @@ effort is fixing those problems in small, reviewed, test-backed steps rather
 than through a single large rewrite, so that every change can be proven not
 to break a working report before it ships.
 
-**Current phase:** Phase 1 — Safety & Test Baseline (`feature/safety-test-baseline`).
-Establishing an offline test suite and a complete issue register before any
-pipeline behavior is changed. Awaiting review and approval before further work.
+**Current phase:** Phase 2 — Shared Configuration Foundation
+(`feature/shared-config-foundation`). Phase 1's safety baseline was validated
+at `545852d` (97 offline tests), and Phase 2 is adding a parity-checked shared
+settings source before any legacy entry point is migrated.
 
 **What has been completed:**
 
-- A full, evidence-based audit of the pipeline: 41 tracked findings, each
+- A full, evidence-based audit of the pipeline: 46 tracked findings, each
 with exact file/line evidence and a safe way to reproduce it (see
 `docs/code-audit.md`).
-- An offline, credential-free automated test suite (50 tests) that proves
+- An offline, credential-free automated test suite (103 tests) that proves
 several of the most serious findings using the real production code —
 without ever touching BigQuery, Google Drive, or any real credentials.
 - A repository misconfiguration that would have silently discarded any test
@@ -78,19 +79,21 @@ under a *different* campaign's identity.
 - The web dashboard can trigger production data writes, including for every
 campaign at once, with no login required.
 
-**Currently being worked on:** Nothing beyond this baseline — the project is
-paused for review of Phase 1 before any pipeline code changes begin.
+**Currently being worked on:** An additive shared settings module with
+field-parity tests against the existing component-specific configuration.
+No production or manual entry point consumes it yet.
 
-**What comes next (pending approval):** Unifying scattered configuration,
-then fixing the confirmed issues above one at a time, each with its own
-tests and sign-off, starting with the highest-severity findings.
+**What comes next (pending approval):** Migrate one project at a time to the
+shared configuration, preserving component-specific values and output parity,
+then continue the architecture roadmap with staging, service boundaries,
+runtime identity, and a user-facing dashboard.
 
 **Safety statement:** No production data or cloud services (BigQuery,
 Google Drive, Secret Manager) were written to, modified, or deleted during
 this audit or while building the test suite. No real credentials were
-created, read, or used. All 50 tests run entirely offline.
+created, read, or used. All 103 tests run entirely offline.
 
-**Last updated:** 2026-08-19
+**Last updated:** 2026-08-21
 
 **Further reading:**
 

@@ -76,6 +76,7 @@ validation" instead, however plausible it looks.
 | [IH-044](#ih-044) | `navigate_and_search_file`'s `month_name` default evaluated once at import, not per call | High | **Fixed** |
 | [IH-046](#ih-046) | `projects/automation/main.py` fails on dotted import (`from projects.automation.main import main`) | Medium | **Fixed** |
 | [IH-047](#ih-047) | IH-046's fix left automation's flat imports import-order-dependent against a same-named segments file | High | **Fixed** |
+| [IH-048](#ih-048) | Divergent configuration copies have no parity-checked shared source | Medium | In Progress |
 
 ---
 
@@ -1502,3 +1503,70 @@ python -m pytest tests/unit/test_automation_main_import.py -v
 
 **Branch/PR/commit that fixes it:** `feature/safety-test-baseline` (this branch).
 **Date resolved:** 2026-08-20
+
+---
+
+## Architecture and configuration-unification findings
+
+*IH-048 was not found by an automated review of a prior fix (unlike
+IH-044/046/047 above) -- it was identified directly during Phase 2
+architecture planning, by reading the four legacy `variables.py` files and
+confirming their divergence.*
+
+### IH-048
+**Title:** Divergent configuration copies have no parity-checked shared source
+**Severity:** Medium
+**Status:** In Progress
+**Date discovered:** 2026-08-21 (Phase 2 architecture review)
+
+**Business impact:** Dataset names, table names, country mappings, Drive
+locations, status labels, secret resource names, and query placeholders are
+copied across the four project areas. A value changed in only one copy can
+silently send a manual or scheduled workflow to a different table, folder, or
+country mapping from the other workflows.
+
+**Technical explanation:** The legacy entry points load independent
+`variables.py` modules, while campaign-specific values also live in separate
+`input.py` files. The copies are not identical: POI intentionally uses the
+`Lookups` dataset where the other components use `Metadata`; the component
+country mappings contain different country sets; and Campaign Tracker's
+legacy Drive URL differs from the Segments/AdOps URL. Therefore config
+unification cannot safely choose one existing file as canonical or replace
+all copies in a single edit.
+
+**Exact file and line evidence:**
+- `projects/automation/variables.py:6-48,83-107`
+- `projects/campaign-tracker/variables.py:5-51`
+- `projects/segments/scripts/variables.py:5-49,92-112`
+- `projects/poi/variables.py:4-28`
+- `docs/modernization-spec.md:329-331` requires field-by-field proof before
+  retiring the legacy copies.
+
+**How to reproduce / verify safely:**
+```
+python -m pytest -q tests/unit/test_shared_config_settings.py
+```
+The tests load each legacy variables module by exact path and compare every
+shared primitive/mapping represented in the new foundation. Real Google
+client constructors remain blocked by `tests/conftest.py`.
+
+**Progress applied:** Added the side-effect-free
+`shared/config/settings.py` foundation with component-scoped views wherever
+the legacy values differ, plus six field-parity tests. No legacy entry point,
+query, schema, credential flow, or production module imports the new settings
+yet, so runtime behavior and output are unchanged. Per-campaign values such
+as campaign names and dates remain in `CampaignConfig`; they are user input,
+not global settings. Legacy key-file paths are represented only under
+explicit `LEGACY_*` names and must not be used by new code.
+
+**Recommended correction:** Migrate one entry point at a time to delegate to
+the shared settings, preserving its scoped values and passing both the full
+offline suite and output-parity checks. Remove a legacy `variables.py` or
+`input.py` only after its manual callers are confirmed and parity is proven.
+Migrate authentication separately under IH-029.
+
+**Tests required:** `tests/unit/test_shared_config_settings.py` (6 tests),
+plus the full offline suite on every consuming migration.
+
+**Branch/PR/commit that progresses it:** `feature/shared-config-foundation`
+(uncommitted working tree pending review).
