@@ -1226,6 +1226,17 @@ Confirms `projects/poi/main.py` imports cleanly and exposes its 8 documented fun
 
 **Progress:** Added the smoke-import test the recommended correction suggested. Still **not decided**: whether `projects/poi/` should be wired into CI/tests as a first-class component or remain an intentionally standalone manual tool -- added to the decision queue, since it's a scope/ownership question, not a code defect. Remains **Needs Validation** overall: this test only proves the module *imports*, not that its BigQuery write logic is correct.
 
+**Phase 2b update (2026-08-21, IH-048):** `projects/poi/variables.py`'s
+primitive values (project id, dataset names, table mappings, key path) now
+delegate to `shared/config/settings.py` -- the "its own config, not shared
+with other projects" note below is no longer accurate for those specific
+values, though `projects/poi/input.py` (the per-run POI list) remains
+entirely its own, correctly so, since that's per-use-case data, not global
+configuration. This migration does not touch `projects/poi/main.py`'s
+BigQuery write logic (`insert_pois`, `create_poi_table`, `get_max_poi_id`,
+etc.) and adds no test coverage of it -- IH-036's core "correctness
+unverified" concern is unchanged.
+
 **Recommended correction:** Document its intended purpose (done, `docs/modernization-spec.md` §1.4); ~~add at least a smoke-import test~~ done; ~~decide whether it should be wired into CI/tests~~ not decided, see decision queue.
 
 **Tests required:** `tests/unit/test_poi_main_import.py` (new, 1 test).
@@ -1538,7 +1549,10 @@ all copies in a single edit.
 - `projects/automation/variables.py:6-48,83-107`
 - `projects/campaign-tracker/variables.py:5-51`
 - `projects/segments/scripts/variables.py:5-49,92-112`
-- `projects/poi/variables.py:4-28`
+- `projects/poi/variables.py:4-28` (original, pre-Phase-2b evidence of the
+  hardcoded copy this component used to carry; as of Phase 2b these lines
+  now delegate to `shared/config/settings.py` -- see `projects/poi/variables.py:1-38`
+  for the current, migrated content)
 - `docs/modernization-spec.md:329-331` requires field-by-field proof before
   retiring the legacy copies.
 
@@ -1552,21 +1566,52 @@ client constructors remain blocked by `tests/conftest.py`.
 
 **Progress applied:** Added the side-effect-free
 `shared/config/settings.py` foundation with component-scoped views wherever
-the legacy values differ, plus six field-parity tests. No legacy entry point,
-query, schema, credential flow, or production module imports the new settings
-yet, so runtime behavior and output are unchanged. Per-campaign values such
-as campaign names and dates remain in `CampaignConfig`; they are user input,
-not global settings. Legacy key-file paths are represented only under
+the legacy values differ, plus six field-parity tests. Per-campaign values
+such as campaign names and dates remain in `CampaignConfig`; they are user
+input, not global settings. Legacy key-file paths are represented only under
 explicit `LEGACY_*` names and must not be used by new code.
+
+**Phase 2b (2026-08-21, `feature/poi-shared-config`):** `projects/poi/variables.py`
+is now the first component actually migrated -- its primitive values
+(`project`, `key_bq`, `dataset_footfall`, `dataset_metadata`, `table_mapping`,
+`lookup_country_table`, `lookup_city_table`) delegate to
+`shared/config/settings.py` instead of hardcoding their own copies.
+`schema_poi` (structural BigQuery schema, not a primitive setting) and
+`projects/poi/main.py` are both unchanged. All other three components
+(`projects/automation`, `projects/campaign-tracker`,
+`projects/segments/scripts`) still hardcode their own copies -- runtime
+behavior for those is unaffected. See IH-036 for `projects/poi/`'s own
+integration-status caveats, which this migration doesn't resolve.
+
+**Import-safety fix required for the migration to be safe (found during Phase
+2b, not a new finding -- documented here since it directly affects this
+finding's evidence):** `projects/poi/variables.py` had no `sys.path` handling
+of its own; unlike the file, `shared/` isn't reachable from
+`projects/poi/`'s own directory. A naive `from shared.config import settings`
+would have broken the standalone entry point whenever invoked with a working
+directory other than the repository root (empirically confirmed: `cd
+projects/poi && python main.py` failed with `ModuleNotFoundError: No module
+named 'shared'` before the fix). `variables.py` now computes the repository
+root from its own `__file__` and inserts it into `sys.path` before importing
+`shared.config.settings`, matching the pattern already used by
+`projects/campaign-tracker/main_new.py` and
+`shared/utils/compatibility.py`'s IH-014 fix.
 
 **Recommended correction:** Migrate one entry point at a time to delegate to
 the shared settings, preserving its scoped values and passing both the full
-offline suite and output-parity checks. Remove a legacy `variables.py` or
-`input.py` only after its manual callers are confirmed and parity is proven.
-Migrate authentication separately under IH-029.
+offline suite and output-parity checks (done for `projects/poi/variables.py`
+in Phase 2b). Remove a legacy `variables.py` or `input.py` only after its
+manual callers are confirmed and parity is proven. Migrate authentication
+separately under IH-029.
 
-**Tests required:** `tests/unit/test_shared_config_settings.py` (6 tests),
-plus the full offline suite on every consuming migration.
+**Tests required:** `tests/unit/test_shared_config_settings.py` (6 tests,
+foundation parity) and `tests/unit/test_poi_variables_shared_config.py` (8
+tests, Phase 2b: value parity, `schema_poi` preservation, and three tests
+that run real subprocesses reproducing the standalone entry point's exact
+`sys.path` shape -- without calling `main()`/`process_pois()` -- to prove
+the import works regardless of the caller's working directory). Plus the
+full offline suite on every consuming migration.
 
 **Branch/PR/commit that progresses it:** `feature/shared-config-foundation`
-(uncommitted working tree pending review).
+(foundation, commit `8f35462`); `feature/poi-shared-config` (Phase 2b, POI
+migrated).

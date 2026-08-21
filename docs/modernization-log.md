@@ -7,6 +7,102 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-08-21 — `feature/poi-shared-config` — Phase 2b: POI migrated to shared settings
+
+**Goal:** Migrate the first, lowest-risk component (`projects/poi/`, no
+automated caller per IH-036) to consume `shared/config/settings.py`,
+proving the migration pattern before touching any component with real
+callers.
+
+**Finding progressed:**
+- **IH-048** -- `projects/poi/variables.py`'s primitive values (`project`,
+  `key_bq`, `dataset_footfall`, `dataset_metadata`, `table_mapping`,
+  `lookup_country_table`, `lookup_city_table`) now delegate to
+  `shared/config/settings.py` instead of hardcoding their own copies.
+  `schema_poi` (structural BigQuery schema) and `projects/poi/main.py` are
+  both untouched -- no import-compatibility fix to `main.py` was needed.
+
+**Critical import-safety issue found and fixed before this could be
+considered safe:** `projects/poi/variables.py` had no `sys.path` handling
+of its own. `projects/poi/main.py` loads it as a flat `from variables
+import *`, relying entirely on whatever `sys.path` Python already has at
+invocation time -- a direct script run only puts the script's own
+directory there, not the repository root. **Empirically confirmed this
+would have broken the standalone entry point:** a real subprocess with
+`sys.path = [projects/poi/]` and `cwd = projects/poi/` (a plausible
+invocation: `cd projects/poi && python main.py`) raised
+`ModuleNotFoundError: No module named 'shared'` when `variables.py` did a
+naive `from shared.config import settings`. (A second experiment with
+`cwd = repo_root` happened to succeed only because Python's implicit
+empty-string `sys.path` entry resolves to the repo root in that specific
+case -- not something safe to depend on.) Fixed by having
+`variables.py` compute the repository root from its own `__file__` and
+insert it into `sys.path` before importing `shared.config.settings`,
+matching the pattern already used by
+`projects/campaign-tracker/main_new.py` and IH-014's
+`get_campaign_tracker_main_new()`.
+
+**Files changed:** `projects/poi/variables.py` (migrated),
+`tests/unit/test_poi_variables_shared_config.py` (new, 8 tests),
+`docs/code-audit.md` (IH-048, IH-036), `docs/modernization-log.md` (this
+entry).
+
+**Tests:**
+```
+python -m pytest -q tests/unit/test_poi_variables_shared_config.py
+# 8 passed
+
+python -m pytest -q
+# 111 passed
+
+python -m compileall -q projects shared ui tests campaign_manager.py
+# clean
+
+git diff --check
+# clean once the file's pre-existing, established CRLF line-ending
+# convention is acknowledged -- see note below
+```
+
+Three of the eight new tests spawn real, separate subprocesses (not
+reproducible from inside the pytest process itself, since
+`tests/conftest.py`'s session-scoped fixture already puts the repo root
+on `sys.path` for the whole test session, which would mask exactly this
+bug) with only `projects/poi/` on `sys.path`, confirming
+`variables`/`main` import correctly from both `cwd=repo_root` and
+`cwd=projects/poi`. Neither calls `main()`/`process_pois()` (would
+construct a real BigQuery client); `variables.py` itself only imports
+`bigquery` for `SchemaField` objects, never a client.
+
+**Whitespace-check note:** `git diff --check`'s default rule flags any
+line ending in `\r` as "trailing whitespace" unless `core.whitespace`
+includes `cr-at-eol`. `projects/poi/variables.py` (like the rest of
+`projects/`'s `.py` files) is committed with CRLF line endings
+throughout -- confirmed both the pre-existing committed blob and this
+change's new lines are consistently CRLF, byte-checked directly, not
+assumed. Verified the diff is otherwise clean with `git -c
+core.whitespace=cr-at-eol,trailing-space,space-before-tab diff --check`
+(a one-off flag on a single command, not a persisted config change).
+No real trailing whitespace or tab/space mixing was found.
+
+**Parity implications:** None to output or credential handling. Every
+delegated value is byte-identical to what `projects/poi/variables.py`
+hardcoded before this change (verified by direct comparison against both
+the pre-migration file content and `shared/config/settings.py`, and by
+the new parity tests). `table_mapping` is explicitly kept as a plain
+mutable `dict` (not the read-only `MappingProxyType` `shared/config/settings.py`
+exposes), matching the legacy value's exact type and mutability.
+
+**Next recommended component:** `projects/campaign-tracker/` --
+specifically `main_new.py`'s already-shared-config-aware path first
+(lower risk than touching `main.py`/`variables.py`, which still have
+real, if orphaned per IH-014/IH-046-style history, standalone
+invocation shapes to prove safe the same way this change did for POI).
+`projects/segments/` and `projects/automation/` (the only deployed
+component) should follow only after that pattern is proven on a second,
+still-low-stakes component.
+
+---
+
 ## 2026-08-21 — `feature/shared-config-foundation` — IH-048 foundation added
 
 **Goal:** Start Phase 2 with a side-effect-free, additive settings source
