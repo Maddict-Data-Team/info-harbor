@@ -77,6 +77,7 @@ validation" instead, however plausible it looks.
 | [IH-046](#ih-046) | `projects/automation/main.py` fails on dotted import (`from projects.automation.main import main`) | Medium | **Fixed** |
 | [IH-047](#ih-047) | IH-046's fix left automation's flat imports import-order-dependent against a same-named segments file | High | **Fixed** |
 | [IH-048](#ih-048) | Divergent configuration copies have no parity-checked shared source | Medium | In Progress |
+| [IH-050](#ih-050) | Phase 2e's `shared.config` import is unreachable in the deployed Cloud Function artifact | High | **Fixed** |
 
 ---
 
@@ -1535,16 +1536,30 @@ unification cannot safely choose one existing file as canonical or replace
 all copies in a single edit.
 
 **Exact file and line evidence:**
-- `projects/automation/variables.py:6-48,83-107`
+- `projects/automation/variables.py:6-48,83-107` (original, pre-Phase-2e
+  evidence of the hardcoded copy this component used to carry; as of Phase
+  2e these values delegate to `shared/config/settings.py` -- see
+  `projects/automation/variables.py:1-173` for the current, migrated
+  content)
 - `projects/campaign-tracker/variables.py:5-51`
 - `projects/segments/scripts/variables.py:5-49,92-112`
 - `projects/poi/variables.py:4-28`
+- `projects/segments/input.py:1-48` is a fifth divergent file
+  (`docs/modernization-spec.md:329` calls out "five divergent
+  `variables.py`/`input.py` files"), but it holds per-campaign operator
+  input (`code_name`, `campaign_name`, `dict_custom_segments`, etc.) that
+  is hand-edited before every run, not stable infra configuration --
+  `controlled_size`/`hg_radius` happen to match
+  `settings.DEFAULT_CONTROLLED_SIZE`/`DEFAULT_HOME_GRAPH_RADIUS` today,
+  but this file is deliberately out of scope for delegation, not merely
+  unmigrated yet.
 - `docs/modernization-spec.md:329-331` requires field-by-field proof before
   retiring the legacy copies.
 
 **How to reproduce / verify safely:**
 ```
 python -m pytest -q tests/unit/test_shared_config_settings.py
+python -m pytest -q tests/unit/test_automation_variables_shared_config.py
 ```
 The tests load each legacy variables module by exact path and compare every
 shared primitive/mapping represented in the new foundation. Real Google
@@ -1552,21 +1567,214 @@ client constructors remain blocked by `tests/conftest.py`.
 
 **Progress applied:** Added the side-effect-free
 `shared/config/settings.py` foundation with component-scoped views wherever
-the legacy values differ, plus six field-parity tests. No legacy entry point,
-query, schema, credential flow, or production module imports the new settings
-yet, so runtime behavior and output are unchanged. Per-campaign values such
-as campaign names and dates remain in `CampaignConfig`; they are user input,
-not global settings. Legacy key-file paths are represented only under
+the legacy values differ, plus six field-parity tests. Per-campaign values
+such as campaign names and dates remain in `CampaignConfig`; they are user
+input, not global settings. Legacy key-file paths are represented only under
 explicit `LEGACY_*` names and must not be used by new code.
+
+**Phase 2e (2026-08-26, `feature/automation-shared-config`, based directly
+on `feature/shared-config-foundation`; sibling branches
+`feature/poi-shared-config`, `feature/campaign-tracker-shared-config`, and
+`feature/segments-shared-config` migrated POI/Campaign Tracker/Segments the
+same way but remain separate, unmerged branches as of this writing --
+deliberately not stacked, so each migration stays independently reviewable
+and revertible):** `projects/automation/variables.py`'s primitive values
+(`project`, `folder_id_Backend_Reports`, `secret_ber`, `secret_bq`,
+`key_bq`, `key_google_sheets`, `dataset_LS`, `dataset_footfall`,
+`dataset_BERs`, `dataset_campaign_segments`, `dataset_Districts`,
+`dataset_HWG`, `dataset_mt_Placelift`, `dataset_metadata`, `table_HG`,
+`tbl_cmpgn_tracker`, `tbl_cmpgn_test`, `table_behavior_lookup`,
+`table_os_mapping`, `stage_0`-`stage_6`, `table_mapping`) now delegate to
+`shared/config/settings.py`. `schema_back_end` (structural BigQuery schema)
+is unchanged. `static_query_replace`'s dict literal was left completely
+unmodified -- it's built from the now-delegated local names above, so it
+picks up the correct values transitively. `q_update_status`,
+`q_select_active_interval`, and `q_deduplicate_ber()` were likewise left
+untouched; their f-strings reference the same now-delegated names, so their
+resolved query text is unchanged. `main.py`, `query_orchestrator.py`,
+`upload_backend.py`, `custom_codename.py`, and `queries.ini` are all
+unmodified.
+
+**Import-safety fix required for the migration to be safe (found and fixed
+proactively, same class of issue as Phases 2b/2c/2d):**
+`projects/automation/variables.py` had no `sys.path` handling of its own.
+`main.py`, `query_orchestrator.py`, and `upload_backend.py` all load it via
+`importlib.util.spec_from_file_location` (the IH-047 fix), and
+`custom_codename.py` loads it as a flat `from variables import *` -- none
+of those callers put the repository root on `sys.path`. Fixed the same way
+as Phases 2b/2c/2d: `variables.py` computes the repository root from its
+own `__file__` and inserts it into `sys.path` before importing
+`shared.config.settings` (now inside a `try`/`except ImportError`, per the
+IH-050 correction below), verified for both loading styles via real
+subprocess invocations from `cwd=repo_root` and
+`cwd=projects/automation`.
+
+**Deployment-packaging correction (found by security review before this
+branch was committed -- see [IH-050](#ih-050) for the full writeup):** the
+first version of this migration made `variables.py` import
+`shared.config.settings` unconditionally, which would have broken the real
+deployed Cloud Function (`--source projects/automation` never uploads
+`shared/`). Fixed by adding `projects/automation/_shared_config_fallback.py`
+(a self-contained, byte-identical copy of the values Automation needs,
+inside the deployed source tree) and having `variables.py` prefer
+`shared.config.settings` when reachable and fall back to it otherwise.
+
+**Pre-existing risk observed, not fixed (out of scope for a config
+migration):** `custom_codename.py` uses plain `import upload_backend`,
+`import query_orchestrator`, and `from variables import *` rather than the
+`importlib.util.spec_from_file_location` pattern IH-047 applied to
+`main.py`/`query_orchestrator.py`/`upload_backend.py` -- the same
+same-named-module collision class IH-047 describes (this time via
+`custom_codename.py` as the unguarded caller) remains possible if a
+segments worker script with a same-named module loads first in a
+long-running process that also reaches `custom_codename.py`'s logic.
+Not touched here; would need its own finding and fix.
 
 **Recommended correction:** Migrate one entry point at a time to delegate to
 the shared settings, preserving its scoped values and passing both the full
-offline suite and output-parity checks. Remove a legacy `variables.py` or
-`input.py` only after its manual callers are confirmed and parity is proven.
-Migrate authentication separately under IH-029.
+offline suite and output-parity checks (done for `projects/poi/variables.py`
+in Phase 2b, `projects/campaign-tracker/variables.py` in Phase 2c,
+`projects/segments/scripts/variables.py` in Phase 2d, and
+`projects/automation/variables.py` in Phase 2e -- all four legacy
+`variables.py` files cited by this finding's original evidence are now
+migrated, each on its own unmerged branch). Remove a legacy `variables.py`
+only after its manual callers are confirmed and parity is proven, and only
+once these branches are actually merged. Migrate authentication separately
+under IH-029. `projects/segments/input.py` remains intentionally
+unmigrated (see evidence above).
 
-**Tests required:** `tests/unit/test_shared_config_settings.py` (6 tests),
-plus the full offline suite on every consuming migration.
+**Tests required:** `tests/unit/test_shared_config_settings.py` (6 tests,
+foundation parity); `tests/unit/test_poi_variables_shared_config.py` (8
+tests, Phase 2b); `tests/unit/test_campaign_tracker_variables_shared_config.py`
+(13 tests, Phase 2c); `tests/unit/test_segments_variables_shared_config.py`
+(16 tests, Phase 2d); `tests/unit/test_automation_variables_shared_config.py`
+(19 tests, Phase 2e: value parity for every delegated primitive,
+`static_query_replace` and all three queries proven to resolve to
+byte-identical text, `schema_back_end` unchanged field-by-field, and
+subprocess-based real-invocation-shape tests for `variables.py`, `main.py`,
+`query_orchestrator.py`, `upload_backend.py`, and `custom_codename.py`
+across `cwd=repo_root`/`cwd=projects/automation` -- without calling any
+operational function); `tests/unit/test_automation_deploy_artifact_isolated.py`
+(4 tests, IH-050: see below). Plus the full offline suite on every
+consuming migration.
 
 **Branch/PR/commit that progresses it:** `feature/shared-config-foundation`
-(uncommitted working tree pending review).
+(foundation, commit `8f35462`); `feature/poi-shared-config` (Phase 2b, POI
+migrated, unmerged); `feature/campaign-tracker-shared-config` (Phase 2c,
+Campaign Tracker migrated, unmerged); `feature/segments-shared-config`
+(Phase 2d, Segments migrated, unmerged); `feature/automation-shared-config`
+(Phase 2e, Automation migrated, IH-050 packaging fix included -- this
+branch, pending review, not yet committed).
+
+---
+
+### IH-050
+**Title:** Phase 2e's `shared.config` import is unreachable in the deployed Cloud Function artifact
+**Severity:** High
+**Status:** Fixed
+**Date discovered:** 2026-08-26, by a security review of the uncommitted
+Phase 2e (`feature/automation-shared-config`) working tree, before it was
+committed. Not found by this session's own offline test suite -- see
+Technical explanation for why the suite structurally could not have caught
+it.
+
+**Business impact:** `projects/automation/main.py` is the **only** part of
+this repository CI actually deploys (`.github/workflows/deploy.yml`, to
+Cloud Function `ih-cf-executor`, per `docs/modernization-spec.md:55-56`).
+Had Phase 2e's original, unconditional `from shared.config import
+settings` reached `main`, the next push to `main` would have redeployed a
+Cloud Function whose entry point fails at import time on every single
+invocation (`ModuleNotFoundError: No module named 'shared'`) -- a total,
+immediate outage of the only production entry point in this repository,
+not a partial degradation.
+
+**Technical explanation:** `.github/workflows/deploy.yml:31` runs `gcloud
+functions deploy ih-cf-executor ... --source projects/automation`.
+`--source` uploads exactly that directory's contents and nothing outside
+it -- `shared/config/settings.py` lives three levels above
+`projects/automation/variables.py` and is never part of the deployed
+artifact, regardless of what `variables.py`'s own `sys.path.insert(0,
+_repo_root)` computes (there is no `shared/` at that computed path in the
+deployed environment either way, since the whole repository above
+`projects/automation/` simply isn't there). Every test added for the
+original Phase 2e migration ran inside a full checkout of this
+repository, where `tests/conftest.py`'s session-scoped autouse fixture
+already puts the repo root on `sys.path` -- `shared` was importable in
+every test process by construction, so no offline test exercised the one
+condition (a process that only ever had `projects/automation/` available)
+that reproduces the real deploy.
+
+**Exact file and line evidence:**
+- `projects/automation/variables.py:21` (original: unconditional `from
+  shared.config import settings`)
+- `.github/workflows/deploy.yml:31` (`--source projects/automation`)
+- `docs/modernization-spec.md:55-56` (Automation is the only CI-deployed
+  component)
+- `docs/modernization-spec.md:198-201` ("Constrained by one hard fact: CI
+  deploys the Cloud Function from `--source projects/automation` ... Any
+  restructure must keep that directory deployable as a self-contained
+  source root, or the CI step must change in lockstep with the code move
+  -- never one without the other.")
+
+**How to reproduce / verify safely:**
+```
+python -m pytest -q tests/unit/test_automation_deploy_artifact_isolated.py
+```
+`TestIsolatedDeployArtifact` builds a copy of only the files
+`--source projects/automation` would actually upload (git-tracked files
+under that directory, plus this branch's own two new, not-yet-committed
+files, minus `__pycache__`), runs a real subprocess with only that copy on
+`sys.path`, and first asserts `shared` is genuinely unimportable there
+(proving the isolation itself is real) before asserting `variables`/`main`
+still import successfully. Reverting the fix locally and rerunning
+reproduces the original failure (`ModuleNotFoundError: No module named
+'shared'`) -- confirmed during this fix's own development, not merely
+asserted.
+
+**Fix applied:** Added `projects/automation/_shared_config_fallback.py` --
+a self-contained module, inside `projects/automation/` (and therefore
+inside the deployed source tree), holding an exact, byte-identical copy of
+the constants `variables.py` needs from `shared/config/settings.py`.
+`projects/automation/variables.py:26-40` now tries `from shared.config
+import settings` first (the parity-checked canonical source, reachable in
+any full-repository context: tests, `custom_codename.py`, local runs) and
+falls back to loading `_shared_config_fallback.py` by explicit path
+(`importlib.util.spec_from_file_location`, not a bare `import`, so it does
+not depend on `_script_dir` being on `sys.path`) only when `shared`,
+`shared.config`, or `shared.config.settings` specifically is missing
+(`except ModuleNotFoundError` checked against `.name`, not a bare `except
+ImportError` -- narrowed during this session's own follow-up self-review
+so a genuine internal import error raised from inside an actually-present
+`shared/config/settings.py` re-raises instead of being silently routed to
+the fallback). No query, schema, credential flow, or entry point changed;
+this only changes where the fallback values come from when `shared/` is
+absent.
+
+**Why this doesn't reintroduce IH-048's duplication problem:**
+`_shared_config_fallback.py`'s values are covered by their own parity
+test (`TestFallbackMatchesSharedSettings` in
+`tests/unit/test_automation_deploy_artifact_isolated.py`) asserting every
+value equals its `shared/config/settings.py` counterpart -- if either
+file changes without the other, the full suite fails immediately. This is
+an explicitly temporary compatibility adapter, not a second canonical
+source: `shared/config/settings.py` is still preferred whenever it's
+reachable.
+
+**Not done here, and why:** `.github/workflows/deploy.yml` was not
+changed. `docs/modernization-spec.md:198-201` requires that any change to
+what `--source projects/automation` needs go hand-in-hand with a CI
+change; a real fix at that layer (e.g. bundling `shared/` into the
+deployed source, per the `deploy/` packaging shim envisioned for Phase 7
+in `docs/modernization-spec.md`'s target structure) is deploy-related,
+cannot be verified without real `gcloud` access (explicitly out of this
+session's safety boundary), and is a larger structural change than one
+finding's fix should carry. The fallback module is the smallest change
+that keeps `projects/automation/` genuinely self-contained today.
+
+**Tests required:** `tests/unit/test_automation_deploy_artifact_isolated.py`
+(4 tests: fallback/settings value parity; `shared` proven genuinely
+unimportable from the isolated copy; `variables.py` and `main.py` proven
+importable from the isolated copy through the fallback path).
+
+**Branch/PR/commit that progresses it:** `feature/automation-shared-config`
+(this branch, pending review, not yet committed).
