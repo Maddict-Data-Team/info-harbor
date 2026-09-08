@@ -78,6 +78,7 @@ validation" instead, however plausible it looks.
 | [IH-047](#ih-047) | IH-046's fix left automation's flat imports import-order-dependent against a same-named segments file | High | **Fixed** |
 | [IH-048](#ih-048) | Divergent configuration copies have no parity-checked shared source | Medium | In Progress |
 | [IH-050](#ih-050) | Phase 2e's `shared.config` import is unreachable in the deployed Cloud Function artifact | High | **Fixed** |
+| [IH-051](#ih-051) | IH-050's fix resolved a generic `shared.config.settings` package name, hijackable by an unrelated `shared` namespace | Medium | **Fixed** |
 
 ---
 
@@ -1596,28 +1597,44 @@ resolved query text is unchanged. `main.py`, `query_orchestrator.py`,
 unmodified.
 
 **Import-safety fix required for the migration to be safe (found and fixed
-proactively, same class of issue as Phases 2b/2c/2d):**
-`projects/automation/variables.py` had no `sys.path` handling of its own.
-`main.py`, `query_orchestrator.py`, and `upload_backend.py` all load it via
+proactively, same class of issue as Phases 2b/2c/2d, superseded by
+[IH-051](#ih-051)):** `projects/automation/variables.py` had no path
+handling of its own for locating `shared/config/settings.py`. `main.py`,
+`query_orchestrator.py`, and `upload_backend.py` all load it via
 `importlib.util.spec_from_file_location` (the IH-047 fix), and
 `custom_codename.py` loads it as a flat `from variables import *` -- none
-of those callers put the repository root on `sys.path`. Fixed the same way
-as Phases 2b/2c/2d: `variables.py` computes the repository root from its
-own `__file__` and inserts it into `sys.path` before importing
-`shared.config.settings` (now inside a `try`/`except ImportError`, per the
-IH-050 correction below), verified for both loading styles via real
-subprocess invocations from `cwd=repo_root` and
+of those callers put the repository root anywhere discoverable.
+`variables.py` now computes its own expected canonical file path
+(`<repo_root>/shared/config/settings.py`) directly from its own `__file__`
+and loads whichever file exists there by exact path -- **not** by
+mutating `sys.path` or importing the `shared.config.settings` package
+name (an earlier version of this fix did both; see IH-051, which replaced
+that approach after a second security review). Verified for every loading
+style via real subprocess invocations from `cwd=repo_root` and
 `cwd=projects/automation`.
 
-**Deployment-packaging correction (found by security review before this
-branch was committed -- see [IH-050](#ih-050) for the full writeup):** the
-first version of this migration made `variables.py` import
-`shared.config.settings` unconditionally, which would have broken the real
-deployed Cloud Function (`--source projects/automation` never uploads
-`shared/`). Fixed by adding `projects/automation/_shared_config_fallback.py`
-(a self-contained, byte-identical copy of the values Automation needs,
-inside the deployed source tree) and having `variables.py` prefer
-`shared.config.settings` when reachable and fall back to it otherwise.
+**Deployment-packaging corrections (found by two successive security
+reviews before this branch was committed -- see [IH-050](#ih-050) and
+[IH-051](#ih-051) for the full writeups):** the first version of this
+migration made `variables.py` import `shared.config.settings`
+unconditionally, which would have broken the real deployed Cloud Function
+(`--source projects/automation` never uploads `shared/`) -- **IH-050**.
+The fix for that ([IH-050](#ih-050)) inserted a computed repository root
+into `sys.path` and imported the generic package name
+`shared.config.settings`, which a second review found could resolve
+against an unrelated `shared` namespace elsewhere on `sys.path` inside the
+deployed artifact instead of failing over to the bundled fallback --
+**IH-051**. The final state never mutates `sys.path` and never imports
+`shared.config.settings` by name at all: `variables.py` loads either the
+real `shared/config/settings.py` or
+`projects/automation/_shared_config_fallback.py` (a self-contained,
+byte-identical copy of the values Automation needs, bundled inside the
+deployed source tree) by exact, computed filesystem path. The duplicated
+fallback file remains an **interim packaging compatibility measure**;
+replacing it with proper artifact packaging (bundling `shared/` into what
+`--source` actually uploads) belongs to the later packaging phase
+(`docs/modernization-spec.md`'s Phase 7 / `deploy/` packaging shim), not
+this config-unification finding.
 
 **Pre-existing risk observed, not fixed (out of scope for a config
 migration):** `custom_codename.py` uses plain `import upload_backend`,
@@ -1772,9 +1789,152 @@ finding's fix should carry. The fallback module is the smallest change
 that keeps `projects/automation/` genuinely self-contained today.
 
 **Tests required:** `tests/unit/test_automation_deploy_artifact_isolated.py`
-(4 tests: fallback/settings value parity; `shared` proven genuinely
+(`TestFallbackMatchesSharedSettings` and `TestIsolatedDeployArtifact`: 4
+tests -- fallback/settings value parity; `shared` proven genuinely
 unimportable from the isolated copy; `variables.py` and `main.py` proven
-importable from the isolated copy through the fallback path).
+importable from the isolated copy through the fallback path). The same
+file gained 4 more tests under [IH-051](#ih-051) once that finding's fix
+landed; see that section for what they cover.
 
 **Branch/PR/commit that progresses it:** `feature/automation-shared-config`
-(this branch, pending review, not yet committed).
+(commit `efe1ab0`; superseded in the same branch by [IH-051](#ih-051)'s
+correction, pending review, not yet committed).
+
+---
+
+### IH-051
+**Title:** IH-050's fix resolved a generic `shared.config.settings` package name, hijackable by an unrelated `shared` namespace
+**Severity:** Medium
+**Status:** Fixed
+**Date discovered:** 2026-09-08, by a second, independent security review
+of `feature/automation-shared-config` commit `efe1ab0` (the IH-050 fix),
+before any further commit. ID confirmed unused by scanning
+`docs/code-audit.md` across every remote branch at the time of this fix
+(`origin/main`, `origin/dev`, `origin/dev-1`,
+`origin/feature/safety-test-baseline`, `origin/feature/shared-config-foundation`,
+`origin/feature/poi-shared-config`,
+`origin/feature/campaign-tracker-shared-config`,
+`origin/feature/segments-shared-config`, `origin/fix/numpy-pandas-compat`)
+plus this branch's own working tree and `docs/modernization-log.md` --
+the highest ID found anywhere was IH-050 itself.
+
+**Business impact:** Same production entry point as IH-050
+(`projects/automation/main.py`, the only Cloud Function this repository's
+CI deploys). IH-050's fix made the deployed artifact importable again,
+but by resolving the generic package name `shared.config.settings`
+rather than a specific file, it opened a narrower but still real risk:
+inside the deployed, source-only artifact, if the Cloud Functions Python
+runtime or any installed dependency happens to expose its own top-level
+`shared` namespace (or one is planted by anything else the runtime loads
+before this module), Automation's configuration -- project ID, dataset
+and table names, status labels, Secret Manager resource identifiers --
+could silently come from that unrelated code instead of either the real
+`shared/config/settings.py` or the bundled fallback, with no error raised
+at all.
+
+**Technical explanation:** IH-050's fix computed a repository root from
+`variables.py`'s own `__file__` and inserted it into `sys.path`, then ran
+`from shared.config import settings`. That is still a name-based import:
+Python's import machinery resolves `shared.config.settings` by searching
+every entry on `sys.path` **in order** and returning the first match --
+it does not know or care that the intended target was specifically the
+file at the computed repository-root path. Two problems follow: (1) in
+the deployed artifact, the computed "repository root" is a path that
+exists on that machine's filesystem but does not contain this
+repository's `shared/` directory at all (the artifact never uploaded
+`shared/`), so anything the runtime environment happens to expose under
+that name from elsewhere on `sys.path` would be found instead; (2) even
+in a full repository checkout, inserting a computed path at the front of
+`sys.path` and then doing a plain `import shared...` provides no
+guarantee that some other, earlier `sys.path` entry (e.g. an installed
+package, a `PYTHONPATH` entry, or a colliding test double left in
+`sys.modules`) doesn't win the resolution first, depending on import
+order across a long-running process -- the same general hazard class as
+IH-047, but against an external/ambient namespace instead of a
+same-named sibling file inside this repository.
+
+**Exact file and line evidence:**
+- `projects/automation/variables.py:16-21,37` (commit `efe1ab0`: computed
+  `sys.path.insert(0, _repo_root)` followed by `from shared.config import
+  settings`)
+- `docs/modernization-spec.md:198-201` (the same "must keep the deploy
+  source self-contained" constraint IH-050 cites)
+
+**How to reproduce / verify safely:**
+```
+python -m pytest -q tests/unit/test_automation_deploy_artifact_isolated.py::TestConflictingSharedPackageIsIgnored
+```
+`TestConflictingSharedPackageIsIgnored` builds a standalone, fully
+importable fake `shared.config.settings` package (with obviously-wrong
+`"HIJACKED"` sentinel values) entirely outside this repository, then: (1)
+in a full repository checkout, puts the fake package first on `sys.path`
+and additionally poisons `sys.modules['shared']` /
+`sys.modules['shared.config']` / `sys.modules['shared.config.settings']`
+directly, loads `variables.py`, and asserts it still resolves to the real
+canonical file (by `__file__`, not just by value); (2) in a real
+subprocess running only the isolated deploy-artifact copy plus the fake
+package on `sys.path`, asserts `variables.py` still resolves to its own
+bundled `_shared_config_fallback.py` (again by `__file__`), never to the
+fake package, and never fails outright either. Reverting the fix locally
+(restoring commit `efe1ab0`'s `variables.py`) and rerunning reproduces
+concrete failures -- not merely asserted, done during this fix's own
+development: the in-process test fails with `AttributeError: module
+'shared.config.settings' has no attribute 'DRIVE_BACKEND_REPORTS_FOLDER_ID'`
+(the poisoned stub module lacks it), and the subprocess test fails with
+`KeyError: 'KSA'` (the fake package's sentinel `table_mapping` doesn't
+contain that key) -- both confirming the vulnerable code silently
+resolved to the wrong, attacker-controlled module instead of erroring
+cleanly or using the real values.
+
+**Fix applied:** `projects/automation/variables.py` no longer touches
+`sys.path` at all and never performs a name-based `import shared...` of
+any kind. It computes its own expected canonical file path directly --
+`os.path.join(_repo_root, "shared", "config", "settings.py")`, with
+`_repo_root` derived the same way as before from `variables.py`'s own
+`__file__`, but used only as a plain string for `os.path.isfile()` and
+`importlib.util.spec_from_file_location`, never appended to `sys.path`.
+If that exact file exists, it's loaded by exact path; otherwise
+`projects/automation/_shared_config_fallback.py` is loaded by exact path.
+Either way, the module is loaded via
+`importlib.util.spec_from_file_location` under a private module name
+(`automation_shared_config_settings` or `automation_shared_config_fallback`),
+never registered in `sys.modules` under the ambiguous name `shared` or
+any of its submodules, so there is no package name for anything else to
+collide with. The spec and its loader are checked for `None` and an
+`ImportError` is raised with the attempted path if loading cannot
+proceed, rather than failing with a confusing `AttributeError` deeper in
+the file (matching this codebase's general practice of raising a clear
+error rather than one from far away, e.g. IH-016).
+
+**Why this doesn't reintroduce IH-048's duplication problem:** unchanged
+from IH-050's reasoning -- `_shared_config_fallback.py`'s values remain
+covered by `TestFallbackMatchesSharedSettings`'s parity assertions
+against `shared/config/settings.py`. This fix only changes *how* the
+correct file is located, not what values either file contains, and the
+duplicated fallback continues to be treated as an interim packaging
+compatibility measure, not a second canonical source.
+
+**Not done here, and why:** `.github/workflows/deploy.yml` remains
+unmodified, for the same reason IH-050 gave: a real fix at that layer
+(bundling `shared/` into what `--source` actually uploads) is Phase 7
+packaging territory, requires real `gcloud` verification this session
+cannot perform, and is a larger change than this finding's fix should
+carry. Exact-path loading is the narrowest correction available that
+keeps `projects/automation/` self-contained without touching CI.
+
+**Tests required:** `tests/unit/test_automation_deploy_artifact_isolated.py`
+(4 additional tests beyond IH-050's original 4, 8 total in the file):
+`TestCanonicalVsFallbackSelection` (2 tests -- proves *which* file was
+loaded, by `__file__`, not just that the resulting values matched: a full
+repository checkout must resolve to the real
+`shared/config/settings.py`, and the isolated deploy copy must resolve to
+its own bundled fallback file) and `TestConflictingSharedPackageIsIgnored`
+(2 tests -- the collision regression tests described above, for both
+contexts). `_deploy_source_relpath()` also now reads the actual
+`--source` argument out of `.github/workflows/deploy.yml` at test time
+instead of hardcoding `"projects/automation"`, so the isolated-copy tests
+stay correct if that workflow's deploy directory ever changes.
+
+**Branch/PR/commit that progresses it:** `feature/automation-shared-config`
+(this branch, on top of commit `efe1ab0`, pending review, not yet
+committed).

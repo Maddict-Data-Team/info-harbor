@@ -7,6 +7,140 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-09-08 — `feature/automation-shared-config` — IH-051: stop resolving `shared.config.settings` by name, load by exact path only
+
+**Goal:** Correct a Medium finding from a second, independent security
+review of commit `efe1ab0` (the IH-050 fix below): eliminate the
+remaining `sys.path` mutation and generic-package-name import entirely,
+on top of the same, already-pushed commit -- not a new branch, not an
+amendment of that commit, per instruction to leave it uncommitted pending
+this review.
+
+**Finding progressed:**
+- **IH-051** (Medium, Fixed) -- `efe1ab0`'s fix for IH-050 inserted a
+  computed repository root into `sys.path` and then ran `from
+  shared.config import settings`. That's a name-based import: Python
+  resolves it against whatever is on `sys.path`, in order, not
+  specifically against this repository's own file. Inside the deployed,
+  source-only Cloud Function artifact, the computed "repository root"
+  points outside the artifact entirely (since `shared/` was never
+  uploaded there in the first place) -- if the Cloud Functions runtime or
+  any dependency happens to expose its own top-level `shared` namespace,
+  Automation's configuration could silently come from that instead of
+  either the real settings or the bundled fallback, with no error at all.
+  Full writeup: `docs/code-audit.md` IH-051.
+
+**ID check performed before assigning IH-051:** scanned
+`docs/code-audit.md` across every remote branch (`origin/main`,
+`origin/dev`, `origin/dev-1`, `origin/feature/safety-test-baseline`,
+`origin/feature/shared-config-foundation`,
+`origin/feature/poi-shared-config`,
+`origin/feature/campaign-tracker-shared-config`,
+`origin/feature/segments-shared-config`,
+`origin/fix/numpy-pandas-compat`) plus this branch's own working tree and
+`docs/modernization-log.md` itself -- highest ID found anywhere was
+IH-050 (this branch's own prior commit). IH-051 was unused.
+
+**Fix applied:** `projects/automation/variables.py` no longer mutates
+`sys.path` and no longer performs `from shared.config import settings` or
+any other name-based import of `shared`. It computes its own expected
+canonical path directly --
+`os.path.join(_repo_root, "shared", "config", "settings.py")`, with
+`_repo_root` derived from `variables.py`'s own `__file__` exactly as
+before but used only as a string, never appended to `sys.path` -- and
+loads whichever file actually exists there via
+`importlib.util.spec_from_file_location`: the real
+`shared/config/settings.py` when present (any full repository checkout),
+or `projects/automation/_shared_config_fallback.py` by exact path
+otherwise (the deployed artifact). Both are loaded under private module
+names and never registered as `shared`/`shared.config`/
+`shared.config.settings` in `sys.modules`, so there is no ambiguous name
+left for anything else to collide with. The spec and its loader are
+checked for `None`, raising a clear `ImportError` naming the attempted
+path if loading can't proceed, instead of failing confusingly later. The
+now-unused `sys` import was removed from `variables.py`.
+
+**The duplicated fallback remains an interim packaging compatibility
+measure, not a permanent design.** Its values are still guarded by
+`TestFallbackMatchesSharedSettings`'s parity assertions against
+`shared/config/settings.py`, so the two cannot silently drift. Replacing
+this fallback with proper artifact packaging -- bundling `shared/` into
+what `.github/workflows/deploy.yml`'s `--source` actually uploads --
+belongs to the later packaging phase
+(`docs/modernization-spec.md`'s Phase 7 / `deploy/` packaging shim), not
+this config-unification finding. `.github/workflows/deploy.yml` itself
+was not touched here, for the same reason IH-050 gave: that's a
+deploy-related change this session cannot verify against real `gcloud`,
+and a larger structural change than this finding's fix should carry.
+
+**Files changed:** `projects/automation/variables.py` (loading mechanism
+corrected), `tests/unit/test_automation_deploy_artifact_isolated.py`
+(rewritten: 4 new tests added on top of the existing 4, plus the
+isolated-copy helper now derives its target directory from
+`.github/workflows/deploy.yml`'s actual `--source` argument instead of
+hardcoding `"projects/automation"`), `docs/code-audit.md` (IH-048,
+IH-050, IH-051), `docs/modernization-log.md` (this entry).
+
+**Tests:**
+```
+python -m pytest -q tests/unit/test_automation_deploy_artifact_isolated.py
+# 8 passed (4 from IH-050 unchanged in behavior, 4 new for IH-051)
+
+python -m pytest -q
+# 130 passed
+
+python -m compileall -q .
+# clean (permission-denied notice for an unrelated local tests-output/
+# directory outside version control, not a compile error)
+
+git -c core.whitespace=cr-at-eol diff --check
+# clean (same established CRLF acknowledgment as IH-048/IH-050;
+# projects/automation/variables.py is the only file with the pre-existing
+# CRLF convention)
+```
+
+**Collision-test result (the core of this fix's verification):**
+`TestConflictingSharedPackageIsIgnored` builds a standalone, real,
+importable fake `shared.config.settings` package outside the repository,
+with `"HIJACKED"` sentinel values, and proves it is never picked up in
+either context:
+- Full repository checkout: fake package placed first on `sys.path`, AND
+  `sys.modules['shared']`/`['shared.config']`/`['shared.config.settings']`
+  directly poisoned -- `variables.py` still resolves `project ==
+  "maddictdata"` (not `"HIJACKED"`) and `settings.__file__` still equals
+  the real, canonical `shared/config/settings.py`'s absolute path.
+- Isolated deploy-artifact copy: fake package added to `sys.path`
+  alongside the isolated copy -- `variables.py` still resolves to its own
+  bundled `_shared_config_fallback.py` (`settings.__file__` equals that
+  file's absolute path, `"HIJACKED"` appears nowhere in the output).
+
+Confirmed these tests have real detection power, not just a design that
+happens to pass: temporarily restored commit `efe1ab0`'s original
+`variables.py` (the vulnerable, `sys.path`-mutating version) and reran
+just this test class -- both tests failed concretely (`AttributeError:
+module 'shared.config.settings' has no attribute
+'DRIVE_BACKEND_REPORTS_FOLDER_ID'` for the poisoned-sys.modules case, and
+`KeyError: 'KSA'` for the fake-package-on-sys.path subprocess case),
+proving the old code really did resolve to the wrong module. Restored the
+fixed `variables.py` afterward and reran the full suite clean.
+
+**Parity implications:** None. Every exported legacy variable, the one
+schema, both queries, and `q_deduplicate_ber()` are byte-identical to
+before this fix -- this change only alters *how* the settings module
+object is located, not any value it produces or any other file's
+behavior. `TestCanonicalVsFallbackSelection`'s 2 new tests independently
+confirm *which* file gets loaded in each context (by `__file__`), on top
+of the existing value-level parity tests.
+
+**Not done, intentionally:** No commit, amend, push, merge, or PR --
+per instruction, layered as an uncommitted correction on top of the
+already-pushed `efe1ab0`, pending another independent security review.
+`.github/workflows/deploy.yml` was not modified. `.codex/` and
+`projects/automation/test_backend_upload.py` (both untracked, local-only)
+were not opened, referenced, or modified.
+
+---
+
 ## 2026-08-26 — `feature/automation-shared-config` — Phase 2e: Automation migrated to shared settings
 
 **Goal:** Migrate `projects/automation/variables.py` to consume

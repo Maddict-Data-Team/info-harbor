@@ -1,58 +1,67 @@
+import importlib.util
 import os
-import sys
 
 from google.cloud import bigquery
 
-# main.py, query_orchestrator.py, and upload_backend.py all load this
-# file via importlib.util.spec_from_file_location (the IH-047 fix), and
-# custom_codename.py loads it as a flat `from variables import *` -- none
-# of those four callers put the repository root on sys.path themselves.
-# The shared settings module below lives outside this file's own
-# directory, so it must be reachable regardless of which loading style
-# or working directory the caller used. Computed from this file's own
-# location, not inherited from a caller-provided sys.path or cwd -- same
-# fix, same reasoning, as projects/poi/variables.py,
-# projects/campaign-tracker/variables.py, and
-# projects/segments/scripts/variables.py's IH-048 migrations.
+# IH-050/IH-051: Cloud Functions deploys ONLY this directory (--source
+# projects/automation, .github/workflows/deploy.yml:31) -- shared/ lives
+# outside it and is never uploaded. Two successive security reviews
+# found problems with sourcing shared/config/settings.py:
+#
+#   IH-050 (fixed): an unconditional `from shared.config import
+#   settings` import-fails outright in the deployed artifact, since
+#   shared/ genuinely isn't there.
+#
+#   IH-051 (fixed here): the IH-050 fix's own remedy -- inserting a
+#   computed repository root into sys.path and then `from shared.config
+#   import settings` -- reintroduced a subtler problem. Importing the
+#   generic package name `shared.config.settings` lets Python's import
+#   machinery resolve it against ANYTHING already on sys.path, not
+#   necessarily this repository's own shared/config/settings.py --
+#   inside the deployed, source-only artifact, the computed "repository
+#   root" can point outside the artifact entirely, and if the Cloud
+#   Functions runtime or any dependency happens to expose an unrelated
+#   top-level `shared` namespace, Automation could silently load THAT
+#   instead of failing over to its own bundled fallback, running
+#   unrelated code or configuration under the same import statement.
+#
+# Fixed by never mutating sys.path and never importing the generic
+# `shared.config.settings` package name at all. Instead, resolve this
+# file's own expected canonical settings file by its OWN exact,
+# computed filesystem path (not a package lookup), and load whichever
+# file actually exists there -- the real shared/config/settings.py in a
+# full repository checkout, or projects/automation/_shared_config_fallback.py
+# (bundled inside the deployed source tree) when it doesn't -- by exact
+# path via importlib.util.spec_from_file_location. This can never
+# resolve to an unrelated same-named package, because it never performs
+# a name-based import at all.
+#
+# tests/unit/test_automation_deploy_artifact_isolated.py proves both
+# branches produce identical values, that the fallback is exercised
+# when the canonical file is genuinely absent, and that a conflicting
+# fake `shared.config.settings` module injected into sys.modules/
+# sys.path does not get picked up in either case.
 _script_dir = os.path.dirname(os.path.abspath(__file__))
 _repo_root = os.path.dirname(os.path.dirname(_script_dir))
-if _repo_root not in sys.path:
-    sys.path.insert(0, _repo_root)
+_canonical_settings_path = os.path.join(_repo_root, "shared", "config", "settings.py")
+_fallback_settings_path = os.path.join(_script_dir, "_shared_config_fallback.py")
 
-# IH-050: Cloud Functions deploys ONLY this directory (--source
-# projects/automation, .github/workflows/deploy.yml:31) -- shared/ lives
-# outside it and is never uploaded, so `from shared.config import
-# settings` unconditionally would import-fail in the deployed Cloud
-# Function even though it works in every local/test context where the
-# full repository is checked out. Prefer the real, parity-checked
-# shared/config/settings.py when it's reachable; fall back to this
-# directory's own byte-identical copy (_shared_config_fallback.py, which
-# IS part of the deployed source tree) when it isn't. Loaded by explicit
-# path, not a bare `import`, so it does not depend on _script_dir being
-# on sys.path (matching the IH-047 loading pattern already used for this
-# file itself). tests/unit/test_automation_deploy_artifact_isolated.py
-# proves both branches produce identical values and that the fallback is
-# actually exercised when shared/ is genuinely absent.
-try:
-    from shared.config import settings
-except ModuleNotFoundError as _import_error:
-    # Narrowed to exactly "the shared package/module isn't present"
-    # (the deployed-artifact case) -- NOT a bare `except ImportError`,
-    # which would also silently swallow a genuine internal import error
-    # raised from inside an actually-present shared/config/settings.py
-    # (e.g. one of its own imports breaking) and route to the fallback
-    # instead of failing loudly. Re-raise anything else.
-    if _import_error.name not in ("shared", "shared.config", "shared.config.settings"):
-        raise
+if os.path.isfile(_canonical_settings_path):
+    _settings_module_name = "automation_shared_config_settings"
+    _settings_path = _canonical_settings_path
+else:
+    _settings_module_name = "automation_shared_config_fallback"
+    _settings_path = _fallback_settings_path
 
-    import importlib.util as _importlib_util
-
-    _fallback_spec = _importlib_util.spec_from_file_location(
-        "automation_shared_config_fallback",
-        os.path.join(_script_dir, "_shared_config_fallback.py"),
+_settings_spec = importlib.util.spec_from_file_location(_settings_module_name, _settings_path)
+if _settings_spec is None or _settings_spec.loader is None:
+    raise ImportError(
+        f"Could not load a settings module for projects/automation/variables.py "
+        f"from {_settings_path!r} (spec_from_file_location returned "
+        f"{_settings_spec!r})"
     )
-    settings = _importlib_util.module_from_spec(_fallback_spec)
-    _fallback_spec.loader.exec_module(settings)
+settings = importlib.util.module_from_spec(_settings_spec)
+_settings_spec.loader.exec_module(settings)
 
 
 # credentials
