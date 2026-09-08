@@ -10,32 +10,58 @@ unconditionally, which lives outside `projects/automation/` -- that import
 would fail in the deployed artifact, which never contains `shared/` at
 all.
 
-IH-051 (fixed here): IH-050's own remedy -- computing a repository root
-and inserting it into `sys.path`, then `from shared.config import
-settings` -- reintroduced a subtler problem. That's still a name-based
-import of the generic package name `shared.config.settings`, which
-Python's import machinery resolves against WHATEVER is on `sys.path`, not
-necessarily this repository's own file. Inside the deployed, source-only
-artifact, the computed "repository root" can point outside the artifact
-entirely; if the Cloud Functions runtime or any dependency happens to
-expose an unrelated top-level `shared` namespace, Automation could
-silently load THAT instead of its own bundled fallback. Fixed by never
-mutating `sys.path` and never importing `shared.config.settings` by name
-at all -- `variables.py` instead computes its own expected canonical file
-path directly (`<repo_root>/shared/config/settings.py`, derived from
-`variables.py`'s own `__file__`, no package lookup involved) and loads
-whichever file actually exists there -- the real
-`shared/config/settings.py`, or `projects/automation/_shared_config_fallback.py`
-when it doesn't -- via `importlib.util.spec_from_file_location` by exact
-path. A name-based import is never performed, so there is nothing for an
-unrelated same-named package to hijack.
+IH-051, round 1 (superseded by round 2 below): IH-050's own remedy --
+computing a repository root and inserting it into `sys.path`, then `from
+shared.config import settings` -- reintroduced a subtler problem. That's
+still a name-based import of the generic package name
+`shared.config.settings`, which Python's import machinery resolves
+against WHATEVER is on `sys.path`, not necessarily this repository's own
+file. Fixed by never mutating `sys.path` and never importing
+`shared.config.settings` by name at all -- `variables.py` instead
+computed its own expected canonical file path directly
+(`<candidate_root>/shared/config/settings.py`, derived from
+`variables.py`'s own `__file__`) and loaded whichever file actually
+existed there via `importlib.util.spec_from_file_location`.
+
+IH-051, round 2 (superseded by round 3 below): round 1 still trusted "two
+parents above this file" as this repository's root merely because *some*
+file existed at the computed `shared/config/settings.py` path. In the
+deployed, flattened Cloud Function artifact, "two parents above
+`__file__`" is an AMBIENT HOST PATH with no relationship to this
+repository -- if anything (the runtime, a build layer, an unrelated
+package) happens to place a `shared/config/settings.py`-shaped file at
+that ambient location, round 1's logic would silently trust it. Fixed by
+adding a structural precondition: this file's own location must actually
+match the real repository's shape
+(`<candidate_root>/projects/automation/variables.py`, verified both
+syntactically and by `os.path.samefile` resolution) before the canonical
+file at that candidate root is trusted at all.
+
+IH-051, round 3 (fixed here): round 2's exact-layout + samefile checks
+are necessary but NOT sufficient -- they only prove this file sits at the
+*relative path* `projects/automation/variables.py` below the candidate
+root, not that the candidate root is genuinely a checkout of this
+repository at all. A deployed artifact placed at
+`<ambient_root>/projects/automation/variables.py` (matching that exact
+expected shape) would satisfy round 2's checks completely while
+`<ambient_root>` is still not this repository -- a fake
+`<ambient_root>/shared/config/settings.py` would then be trusted. Fixed
+by requiring `<candidate_root>/.git` to exist (a real-checkout marker --
+`os.path.exists()`, not `os.path.isdir()`, since a normal clone has
+`.git` as a directory but a git worktree has it as a plain file
+containing a `gitdir: <path>` pointer) as one more required precondition.
+A real deployment artifact never carries repository metadata for an
+ambient two-parents-up directory to coincidentally or deliberately
+satisfy, so this closes the gap for the actual threat model without
+trying to fully authenticate repository identity.
 
 Offline tests that import from a full repository checkout (as every other
-test in this suite does) cannot detect either bug on their own: the repo
+test in this suite does) cannot detect any of this on their own: the repo
 root is already on `sys.path` there for unrelated reasons
 (`tests/conftest.py`), so `shared` is always importable in that process
-regardless of what a real deploy artifact would contain, and no
-conflicting `shared` package exists in that process either.
+regardless of what a real deploy artifact would contain, this file's own
+real location always genuinely matches the repository's shape there, and
+the real repository checkout genuinely has a `.git` directory.
 
 This file proves, in order:
 
@@ -55,8 +81,16 @@ This file proves, in order:
    resulting values (`TestCanonicalVsFallbackSelection`).
 4. Neither context can be hijacked by an unrelated, conflicting
    `shared.config.settings` placed elsewhere on `sys.path`/`sys.modules`
-   (`TestConflictingSharedPackageIsIgnored` -- the IH-051 regression
-   test).
+   (`TestConflictingSharedPackageIsIgnored`).
+5. A fake `shared/config/settings.py` planted at the EXACT flat ambient
+   candidate path a flattened deployment artifact would compute still
+   loses to the bundled fallback -- the IH-051 round 2 regression test
+   (`TestAmbientCanonicalPathIsNotTrusted`).
+6. A fake `shared/config/settings.py` planted at the candidate root of a
+   deployment artifact that IS nested exactly like a real checkout
+   (`<ambient_root>/projects/automation/variables.py`) but has no `.git`
+   marker still loses to the bundled fallback -- the IH-051 round 3
+   regression test (`TestNestedAmbientRootWithoutGitMarkerIsNotTrusted`).
 
 No test here constructs a real Google client or touches network/
 credentials: variables.py only imports `bigquery` for `SchemaField`
@@ -440,3 +474,137 @@ class TestConflictingSharedPackageIsIgnored:
         )
         actual_settings_file = settings_file_line[len("SETTINGS_FILE "):].strip()
         assert os.path.abspath(actual_settings_file) == expected_fallback
+
+
+class TestAmbientCanonicalPathIsNotTrusted:
+    """IH-051 round 2 regression test: a flat deployment artifact's
+    variables.py computes a "candidate root" two directories above
+    itself, purely from its own __file__ -- in a real deployed Cloud
+    Function, that candidate root is an AMBIENT HOST PATH with no
+    relationship to this repository. This proves that even when a file
+    exists at the exact `<candidate_root>/shared/config/settings.py`
+    path the flat artifact would compute, it is never trusted unless
+    this file's own location also genuinely matches the real
+    repository's shape (`<candidate_root>/projects/automation/
+    variables.py`) -- which a flat artifact's layout can never satisfy,
+    regardless of what happens to exist at the computed path.
+    """
+
+    @pytest.fixture
+    def flat_artifact_with_ambient_fake_settings(self, repo_root, tmp_path):
+        """Builds a flat artifact copy nested exactly two directories
+        below a `candidate_root` this test controls, then plants a fake
+        `shared/config/settings.py` (with obviously-wrong `"HIJACKED"`
+        sentinel values) at the exact path
+        `<candidate_root>/shared/config/settings.py` -- precisely what
+        variables.py's own two-parents-up computation would land on for
+        a flat artifact rooted there."""
+        candidate_root = tmp_path / "ambient_host_root"
+        flat_dir = candidate_root / "layer" / "flat_deploy_dir"
+        _build_isolated_deploy_copy(repo_root, flat_dir)
+
+        fake_config_dir = candidate_root / "shared" / "config"
+        fake_config_dir.mkdir(parents=True)
+        (candidate_root / "shared" / "__init__.py").write_text("", encoding="utf-8")
+        (fake_config_dir / "__init__.py").write_text("", encoding="utf-8")
+        (fake_config_dir / "settings.py").write_text(
+            "PROJECT_ID = 'HIJACKED'\n"
+            "DATASET_METADATA = 'HIJACKED'\n"
+            "DATASET_LOCATION_SIGNALS = 'HIJACKED'\n",
+            encoding="utf-8",
+        )
+        return flat_dir
+
+    def test_ambient_fake_settings_at_the_exact_candidate_path_is_ignored(
+        self, tmp_path, flat_artifact_with_ambient_fake_settings
+    ):
+        result = _run_isolated(tmp_path, flat_artifact_with_ambient_fake_settings, "variables")
+        assert result.returncode == 0, result.stderr
+        assert _EXPECTED_STDOUT in result.stdout
+        assert "HIJACKED" not in result.stdout
+
+        expected_fallback = os.path.abspath(
+            str(flat_artifact_with_ambient_fake_settings / "_shared_config_fallback.py")
+        )
+        settings_file_line = next(
+            line for line in result.stdout.splitlines() if line.startswith("SETTINGS_FILE ")
+        )
+        actual_settings_file = settings_file_line[len("SETTINGS_FILE "):].strip()
+        assert os.path.abspath(actual_settings_file) == expected_fallback
+
+    def test_main_module_also_ignores_the_ambient_fake_settings(
+        self, tmp_path, flat_artifact_with_ambient_fake_settings
+    ):
+        result = _run_isolated(tmp_path, flat_artifact_with_ambient_fake_settings, "main")
+        assert result.returncode == 0, result.stderr
+        assert _EXPECTED_STDOUT in result.stdout
+        assert "HIJACKED" not in result.stdout
+
+
+class TestNestedAmbientRootWithoutGitMarkerIsNotTrusted:
+    """IH-051 round 3 regression test: round 2's exact-layout +
+    samefile checks alone are necessary but NOT sufficient -- they only
+    prove this file sits at the relative path
+    `projects/automation/variables.py` below some candidate root, not
+    that the candidate root is genuinely a checkout of this repository.
+    A deployed artifact could itself be placed at
+    `<ambient_root>/projects/automation/variables.py` -- matching that
+    exact expected shape, satisfying round 2's checks completely --
+    while `<ambient_root>` is still not a real checkout. This proves
+    that even with the directory shape fully matched, a fake
+    `shared/config/settings.py` at the candidate root is still ignored
+    when `<ambient_root>/.git` is absent.
+    """
+
+    @pytest.fixture
+    def nested_ambient_root_without_git(self, repo_root, tmp_path):
+        """Copies the deployment artifact to
+        `<ambient_root>/projects/automation/` (the exact nested shape a
+        real repository checkout would have), deliberately does NOT
+        create `<ambient_root>/.git`, and plants a fake
+        `shared/config/settings.py` (with `"HIJACKED"` sentinel values)
+        at `<ambient_root>/shared/config/settings.py`."""
+        ambient_root = tmp_path / "ambient_root_no_git"
+        nested_automation_dir = ambient_root / "projects" / "automation"
+        _build_isolated_deploy_copy(repo_root, nested_automation_dir)
+
+        assert not (ambient_root / ".git").exists(), (
+            "test setup bug: ambient_root must NOT look like a git checkout"
+        )
+
+        fake_config_dir = ambient_root / "shared" / "config"
+        fake_config_dir.mkdir(parents=True)
+        (ambient_root / "shared" / "__init__.py").write_text("", encoding="utf-8")
+        (fake_config_dir / "__init__.py").write_text("", encoding="utf-8")
+        (fake_config_dir / "settings.py").write_text(
+            "PROJECT_ID = 'HIJACKED'\n"
+            "DATASET_METADATA = 'HIJACKED'\n"
+            "DATASET_LOCATION_SIGNALS = 'HIJACKED'\n",
+            encoding="utf-8",
+        )
+        return nested_automation_dir
+
+    def test_variables_selects_the_bundled_fallback(
+        self, tmp_path, nested_ambient_root_without_git
+    ):
+        result = _run_isolated(tmp_path, nested_ambient_root_without_git, "variables")
+        assert result.returncode == 0, result.stderr
+        assert _EXPECTED_STDOUT in result.stdout
+        assert "HIJACKED" not in result.stdout
+
+        expected_fallback = os.path.abspath(
+            str(nested_ambient_root_without_git / "_shared_config_fallback.py")
+        )
+        settings_file_line = next(
+            line for line in result.stdout.splitlines() if line.startswith("SETTINGS_FILE ")
+        )
+        actual_settings_file = settings_file_line[len("SETTINGS_FILE "):].strip()
+        assert os.path.abspath(actual_settings_file) == expected_fallback
+
+    def test_main_module_also_selects_the_bundled_fallback(
+        self, tmp_path, nested_ambient_root_without_git
+    ):
+        result = _run_isolated(tmp_path, nested_ambient_root_without_git, "main")
+        assert result.returncode == 0, result.stderr
+        assert _EXPECTED_STDOUT in result.stdout
+        assert "HIJACKED" not in result.stdout

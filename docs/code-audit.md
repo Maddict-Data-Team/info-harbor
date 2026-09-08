@@ -1914,27 +1914,157 @@ correct file is located, not what values either file contains, and the
 duplicated fallback continues to be treated as an interim packaging
 compatibility measure, not a second canonical source.
 
+**Round 2 correction (found by a third, independent security review, of
+the round-1 fix above, before any further commit):** round 1 fixed the
+name-based-import hazard but still trusted "two directories above this
+file" as if it were unconditionally this repository's root, purely
+because `os.path.isfile()` found *some* file at the computed
+`shared/config/settings.py` path. In the deployed, flattened Cloud
+Function artifact, "two directories above `__file__`" is an **ambient
+host path** with no relationship to this repository at all -- if the
+Cloud Functions runtime, a build layer, or any unrelated package happens
+to place a `shared/config/settings.py`-shaped file at that ambient
+location, round 1's logic would silently trust it exactly as it would
+trust the real thing in a genuine checkout, since it never verified that
+"two directories above this file" actually corresponds to this
+repository's real layout.
+
+**Exact file and line evidence (round 2):**
+- `projects/automation/variables.py:44-54` (round-1 form: computed
+  `_canonical_settings_path` from `_repo_root` and trusted it purely via
+  `os.path.isfile()`, with no check that `_repo_root` was genuinely this
+  repository's root)
+
+**How to reproduce / verify safely (round 2):**
+```
+python -m pytest -q tests/unit/test_automation_deploy_artifact_isolated.py::TestAmbientCanonicalPathIsNotTrusted
+```
+`TestAmbientCanonicalPathIsNotTrusted` builds a flat artifact copy nested
+exactly two directories below a `candidate_root` the test controls (the
+same depth `variables.py`'s own two-parents-up computation would land
+on), plants a fake `shared/config/settings.py` (with `"HIJACKED"`
+sentinel values) at exactly `<candidate_root>/shared/config/settings.py`,
+and proves `variables.py`/`main.py` still resolve to the bundled
+`_shared_config_fallback.py`, never the fake file. Reverting to the
+round-1 fix locally and rerunning reproduces a concrete failure --
+confirmed during this fix's own development: `AttributeError: module
+'automation_shared_config_settings' has no attribute
+'DRIVE_BACKEND_REPORTS_FOLDER_ID'`, i.e. round 1 really did load the fake
+ambient file and only failed downstream when it turned out incomplete,
+not at the point of deciding to trust it.
+
+**Fix applied (round 2):** Added a structural precondition before ever
+trusting the canonical path: `variables.py`'s own location must actually
+match the real repository's shape --
+`<candidate_root>/projects/automation/variables.py` -- verified two ways,
+both required: (1) that expected path is syntactically identical to this
+file's own absolute path (case-normalized), and (2) it resolves, via
+`os.path.samefile()`, to this same running file (guards against
+symlinks/case-insensitive filesystems fooling the string check alone).
+Only when both hold, AND `<candidate_root>/shared/config/settings.py`
+exists, is the canonical file trusted; otherwise the fallback is loaded
+unconditionally, regardless of what exists at the computed candidate
+path. In the flat deployment artifact, `variables.py` is never nested
+under a `projects/automation/` directory two levels below any real
+ancestor, so this precondition can never hold there -- the fallback wins
+by construction, not merely "when `shared/` happens to be absent." Still
+never mutates `sys.path`; still never performs a name-based `import
+shared...`; still loads either module only via
+`importlib.util.spec_from_file_location` by exact, explicit path with
+the spec/loader validated before execution.
+
+**Round 3 correction (found by a fourth, independent security review, of
+the round-2 fix above, before any further commit):** round 2's
+exact-layout + `samefile` checks are necessary but **not sufficient** --
+they only prove `variables.py` sits at the *relative path*
+`projects/automation/variables.py` below whatever it computes as the
+candidate root; they never verify that candidate root is actually a
+checkout of this repository. A deployed artifact placed at
+`<ambient_root>/projects/automation/variables.py` -- matching that exact
+expected shape completely -- would satisfy every round-2 precondition
+while `<ambient_root>` is still not this repository. A fake
+`<ambient_root>/shared/config/settings.py` would then be trusted exactly
+as the real one would be.
+
+**Exact file and line evidence (round 3):**
+- `projects/automation/variables.py` (round-2 form: `_use_canonical`
+  checked only `_is_actually_this_file(...)` and
+  `os.path.isfile(_candidate_canonical_path)`, with no verification that
+  `_candidate_root` was genuinely a repository checkout)
+
+**How to reproduce / verify safely (round 3):**
+```
+python -m pytest -q tests/unit/test_automation_deploy_artifact_isolated.py::TestNestedAmbientRootWithoutGitMarkerIsNotTrusted
+```
+`TestNestedAmbientRootWithoutGitMarkerIsNotTrusted` copies the deployment
+artifact to `<ambient_root>/projects/automation/` (the exact nested shape
+a real checkout has -- round 2's location check passes completely),
+deliberately does **not** create `<ambient_root>/.git`, and plants a fake
+`shared/config/settings.py` (with `"HIJACKED"` sentinel values) at
+`<ambient_root>/shared/config/settings.py`. Reverting to the round-2 fix
+locally (removing only the new `.git`-existence precondition) and
+rerunning reproduces a concrete failure -- confirmed during this fix's
+own development: `AttributeError: module
+'automation_shared_config_settings' has no attribute
+'DRIVE_BACKEND_REPORTS_FOLDER_ID'`, i.e. round 2 really did load the fake
+file despite the location check passing, and only failed downstream once
+it turned out incomplete.
+
+**Fix applied (round 3):** Added one more required precondition:
+`<candidate_root>/.git` must exist, checked with `os.path.exists()` (not
+`os.path.isdir()`), since a normal clone has `.git` as a directory but a
+git worktree has it as a plain file (containing a `gitdir: <path>`
+pointer, not a repository itself) -- both must be accepted. This is not
+proof the checkout is genuinely *this* repository, but a real deployment
+artifact (`--source projects/automation`) never carries repository
+metadata for an ambient two-parents-up directory to coincidentally or
+deliberately satisfy, closing the gap for the actual threat model.
+Canonical is now trusted only when ALL of: (a) `variables.py`'s location
+exact-matches the expected repository-relative path, (b) that path
+resolves via `os.path.samefile` to this same running file, (c)
+`<candidate_root>/shared/config/settings.py` exists, AND (d)
+`<candidate_root>/.git` exists. Any single failure routes to the
+colocated fallback unconditionally. Still no `sys.path` mutation, still
+no name-based `import shared...`, still
+`importlib.util.spec_from_file_location` by exact path only, with the
+spec/loader validated before execution.
+
 **Not done here, and why:** `.github/workflows/deploy.yml` remains
 unmodified, for the same reason IH-050 gave: a real fix at that layer
 (bundling `shared/` into what `--source` actually uploads) is Phase 7
 packaging territory, requires real `gcloud` verification this session
 cannot perform, and is a larger change than this finding's fix should
-carry. Exact-path loading is the narrowest correction available that
-keeps `projects/automation/` self-contained without touching CI.
+carry. Exact-path loading plus the location and checkout-marker
+preconditions is the narrowest correction available that keeps
+`projects/automation/` self-contained, immune to ambient-path confusion,
+and without touching CI. The `.git`-existence check is a plausibility
+signal, not cryptographic proof of repository identity -- a
+sufficiently determined attacker who could also plant a fake `.git`
+marker at the exact ambient root would still defeat it; that residual
+risk is accepted as out of scope for a config-unification finding,
+consistent with the fallback file remaining an interim measure pending
+proper artifact packaging (Phase 7).
 
 **Tests required:** `tests/unit/test_automation_deploy_artifact_isolated.py`
-(4 additional tests beyond IH-050's original 4, 8 total in the file):
-`TestCanonicalVsFallbackSelection` (2 tests -- proves *which* file was
-loaded, by `__file__`, not just that the resulting values matched: a full
-repository checkout must resolve to the real
-`shared/config/settings.py`, and the isolated deploy copy must resolve to
-its own bundled fallback file) and `TestConflictingSharedPackageIsIgnored`
-(2 tests -- the collision regression tests described above, for both
-contexts). `_deploy_source_relpath()` also now reads the actual
-`--source` argument out of `.github/workflows/deploy.yml` at test time
-instead of hardcoding `"projects/automation"`, so the isolated-copy tests
-stay correct if that workflow's deploy directory ever changes.
+(12 tests total): `TestFallbackMatchesSharedSettings` (1, foundation
+parity); `TestIsolatedDeployArtifact` (3, IH-050); `TestCanonicalVsFallbackSelection`
+(2 -- proves *which* file was loaded, by `__file__`, not just that the
+resulting values matched); `TestConflictingSharedPackageIsIgnored` (2 --
+the name-based-import collision regression from round 1, for both
+contexts); `TestAmbientCanonicalPathIsNotTrusted` (2 -- the round-2
+regression: a fake canonical file planted at the exact flat ambient
+candidate path of a flat artifact still loses to the fallback, for both
+`variables.py` and `main.py`); `TestNestedAmbientRootWithoutGitMarkerIsNotTrusted`
+(2 -- the round-3 regression: a fake canonical file planted at the exact
+NESTED candidate path of an artifact matching the real repository's
+directory shape, but with no `.git` marker, still loses to the fallback,
+for both `variables.py` and `main.py`). `_deploy_source_relpath()` reads
+the actual `--source` argument out of `.github/workflows/deploy.yml` at
+test time instead of hardcoding `"projects/automation"`, so every
+isolated-copy test stays correct if that workflow's deploy directory
+ever changes.
 
 **Branch/PR/commit that progresses it:** `feature/automation-shared-config`
-(this branch, on top of commit `efe1ab0`, pending review, not yet
+(round 1: on top of commit `efe1ab0`; round 2 and round 3: successive
+corrections, each layered on top of the last, pending review, not yet
 committed).
