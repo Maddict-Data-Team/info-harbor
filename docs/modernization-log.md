@@ -7,45 +7,49 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
-## 2026-09-08 — `feature/phase-a-safety-contracts` — Phase A: design and safety contracts
+## 2026-09-08 — `feature/phase-a-safety-contracts` — Phase A: test/production safety contracts
 
 **Goal:** The Phase A gate of `docs/architecture-and-test-environment-plan.md`
-(lines 184-190) — offline tests for environment parsing, source
-allowlisting, output-name generation, and redaction.
+(lines 184-190) — state the test/production boundary as executable
+contracts with offline tests.
 
-**No live production entry point or behavior changed.** Every module
-added here is additive and imported by nothing that runs: no file under
-`projects/`, `ui/`, or `campaign_manager.py` is modified or references
-this layer, and the gates are never invoked at runtime.
+**Scope note:** the plan names four contracts for Phase A. This change
+delivers three — environment validation, source allowlisting, and
+output-name policy. **Redaction is deferred to the later
+observability/logging phase**, where the logging path it is meant to sit
+in is actually built. Deferring it keeps this change reviewable and
+avoids shipping a redaction layer nothing calls.
+
+**Nothing about production changed.** Every module added here is
+additive and imported by nothing that runs: no file under `projects/`,
+`ui/`, or `campaign_manager.py` is modified or references this layer,
+and the gates are never invoked at runtime.
 `tests/unit/test_environment_contract.py::TestPhaseAModulesAreAdditiveAndUnimported`
-enforces both, and the only tracked files this branch modifies are
-`CLAUDE.md`, this log, and the plan document it commits.
+enforces both. No query, schema, credential flow, output path, or
+deployment file is touched; `.github/workflows/deploy.yml` is unmodified.
 
 **This authorizes no cloud testing.** Nothing here creates or reaches a
 GCP resource or reads `keys/`. Provisioning the test project, Drive
 root, identity, staging TTL, and audit table is Phase C and needs its
 own explicit human approval (plan lines 200-205). The approved
 test-project allowlist ships **empty**, so every output project is
-refused until a human names one (plan "Open decisions before Phase C",
-item 1).
+refused until a human names one.
 
-**No `docs/code-audit.md` finding is opened or updated.** Phase A
-progresses no defect; it establishes contracts for a planned
-capability. `CLAUDE.md` now records that finding-less work needs only a
-log entry, so nobody invents an `IH-###` for it later.
+**Added:**
 
-**Added:** `shared/config/environment.py` (fail-closed
-`parse_environment()`, `RunRequest`, `refusal_reasons()` for the five
-gates at plan lines 98-105, restated there as the five conditions a run
-must fail on); `shared/config/source_allowlist.py` (the
-approved read-only sources plus one `classify_reference()` returning
-`APPROVED_PRODUCTION_SOURCE`, `TEST_CONTROL_TABLE`,
-`TEST_OUTPUT_INTERMEDIATE`, `TEMPORARY_STAGING`,
-`UNRESOLVED_DEPENDENCY`, or `None` for unclassified, which callers must
-treat as unsafe); `shared/config/output_policy.py` (the published
-`_test` policy, the staging exemption, and anchors reproducing today's
-production names byte for byte); `shared/observability/redaction.py`
-(pure, total, idempotent). Four matching test files.
+- `shared/config/environment.py` — fail-closed `parse_environment()`
+  (unset, empty, or a near-miss like `prod` raises rather than resolving
+  to anything), plus `RunRequest`/`refusal_reasons()` for the five gates
+  at plan lines 98-105. Gates report independently, so a caller sees
+  every reason a run was refused rather than the first.
+- `shared/config/source_allowlist.py` — the approved read-only sources
+  and one `classify_reference()` returning `APPROVED_PRODUCTION_SOURCE`,
+  `TEST_CONTROL_TABLE`, `TEST_OUTPUT_INTERMEDIATE`, `TEMPORARY_STAGING`,
+  `UNRESOLVED_DEPENDENCY`, or `None` for unclassified — which callers
+  must treat as unsafe.
+- `shared/config/output_policy.py` — the published `_test` policy, the
+  staging exemption, and anchors reproducing today's production names
+  byte for byte so this layer cannot drift while nothing imports it.
 
 **Design notes.** `TEST_CONTROL_TABLE` names a table's *role*:
 production `Campaign_Tracker` and a `_test` counterpart both land there,
@@ -63,288 +67,51 @@ absorbed.
 **Exhaustive inventory.** `TestEveryQueriesIniReferenceIsClassified`
 resolves every reference both `queries.ini` files issue — substituting
 the settings placeholder maps, each component's country scope, and the
-real `get_country_beh()` — and asserts none is unclassified. It
-currently covers 32 distinct references per component (automation: 22
-approved sources, 1 control table, 8 intermediates, 1 unresolved;
-segments: 31 approved sources, 1 intermediate). The SQL is only ever
-string-substituted, never executed.
+real `get_country_beh()` — and asserts none is unclassified. It covers
+32 distinct references per component (automation: 22 approved sources,
+1 control table, 8 intermediates, 1 unresolved; segments: 31 approved
+sources, 1 intermediate). The SQL is only ever string-substituted,
+never executed.
 
-**Staging exemption, proven not asserted.**
+**Staging exemption, proven rather than asserted.**
 `projects/segments/scripts/push_to_bq.py:64,67` classifies a staging
-table by its final underscore token. Appending `_test` makes that token
-`"test"`, so every controlled row would be written as served. Suffixing a
-*served* table is not safe either — see the correction below.
+table by its final underscore token, so appending `_test` makes that
+token `"test"` and every controlled row is written as served. The damage
+is not one-directional: `push_to_bq.py:62` derives the segment label
+from `" ".join(table_split[2:-2])`, so suffixing a *served* table keeps
+the correct served/control boolean while silently producing a wrong
+label. `would_corrupt_segments_parse()` is the predicate the exemption
+rests on, and it is true for both.
 
-**Caught in this work's own code:** the first redactor treated
-`authorization` with both the generic `key=value` rule and the `Bearer`
-rule, yielding `Authorization: [REDACTED] [REDACTED]` — the token was
-removed but the scheme was eaten as if it were the value. Fixed with a
-whole-header rule. Separately, an `importlib.reload()`-based test
-rebuilt the `Environment` enum and broke identity comparisons in 21
-unrelated tests; replaced with a subprocess, then verified
-order-independent.
+**The gates fail closed on a caller's mistake, not just on bad data.**
+Each of these was reproduced before being fixed, and each has a test: a
+fully qualified destination in the production project passed as long as
+it ended in `_test`; a bare string passed as the allowlist turned the
+membership test into substring containment, so `"test"` satisfied an
+allowlist of `"ih-test-project"`; the string `"test"` passed as the
+environment fell past an `is` comparison; a generator passed for a table
+list was drained by the first evaluation, so the *second* call saw zero
+tables and accepted; an iterable that raised part-way left a closed
+generator the gates then read as empty; and the Drive gate — which asks
+"does a production id appear in this text?" rather than "is this value
+acceptable?" — accepted any value it could not read, including an
+ordinary wrapper object holding the id in an attribute. Drive locations
+are compared after percent-decoding and stripping Unicode format
+characters, since settings records some as bare ids and others as share
+URLs and a folder blocked in one form and waved through in the other is
+not blocked at all.
 
-**Fail-open defects found by security review and fixed before commit.**
-All four were reproduced first, then fixed:
+**Known limits, recorded as decisions.** Percent-decoding stops after
+four rounds; `RunRequest` does not defend against an infinite iterator;
+refusal messages format values with `!r`, so an object whose `__repr__`
+raises escapes the gate. Each needs an adversarial input a layer nothing
+imports never receives, and none is a fail-open. Revisit them in Phase
+B, when these gates first sit in front of a real client.
 
-- A fully qualified destination passed every gate as long as it ended in
-  `_test`, so `maddictdata.Metadata.Campaign_Tracker_test` — a write to
-  *production* — drew zero refusals. Gate 2 now parses the destination:
-  a qualified name must sit in the run's own output project, never the
-  production project, and a malformed name (wrong component count, empty
-  component) is refused rather than guessed at.
-- The Drive gate compared raw strings against a set mixing bare folder
-  IDs with share URLs, so two production folders were unguarded in their
-  other form. Both forms now normalise to a canonical folder ID first;
-  every configured folder is tested as an ID, a URL, a `/u/0/` variant,
-  and with a trailing slash or query string. The gate-4 test no longer
-  parametrises over the module's own constant — that made it tautological
-  and unable to notice a missing entry.
-- `redact_text` was not idempotent on the bare `key=value` path
-  (`token=[REDACTED]]]`, growing per pass), and the test asserting
-  idempotence only exercised the quoted-JSON path, so it could not see
-  it. Fixed, and idempotence is now asserted across every shape.
-- A **truncated** PEM — what a cut log line actually contains — missed
-  the complete-block rule, and the generic rule stopped at the first
-  space, leaving the key body verbatim. A truncated-key rule now
-  consumes the marker and the base64 body after it, with synthetic
-  regression coverage. (Round four narrowed this: see below.)
-
-Also hardened: `latitude`/`longitude` are redacted (same schema, same
-class of harm as a raw identifier); identifier patterns are ASCII-only
-(`\d`/`\w` are Unicode-aware and admitted non-ASCII digits and homoglyph
-project ids); every settings-derived value interpolated into a regex is
-`re.escape()`d uniformly, since `settings.py` already carries a dotted
-constant and an unescaped `.` in an approved-source pattern would widen
-the allowlist.
-
-**A second review round found more, all fixed the same way.** The Drive
-fix above was itself incomplete: it handled the shapes it anticipated,
-so `open?id=<prod>` and `/file/d/<prod>/view` — both formats Drive
-itself emits — normalised to a trailing word ("open", "view") and passed.
-Membership is decided by `names_production_drive_folder()`, which asks
-whether any known production id appears anywhere in the input rather
-than guessing which token is "the" id, so an unanticipated URL layout
-cannot hide an id behind a trailing word; percent-encoding is decoded
-first. (`drive_folder_candidates()` splits on known separators and is
-kept for reporting only — round four found it misses `id:<prod>` and
-quoted forms, and corrected two places in this entry and one docstring
-that claimed the gate used it.) Four redaction leaks were also
-closed: a quoted `'Authorization': 'Basic …'` header (the shape
-requests/google-auth log) matched nothing once `authorization` was
-excluded from the bare rule — it is now excluded from that rule only,
-not the quoted one; `\b`-anchored key names never matched a prefixed
-variable (`GOOGLE_ACCESS_TOKEN`, `SLACK_API_KEY`), since `_` is a word
-character; a value beginning with the literal marker shielded the
-secret behind it (`token=[REDACTED]hunter2` kept `hunter2`); and a
-quoted key with an unquoted or escape-containing value matched neither
-rule. The gates and the classifier are now total for non-string input —
-they refuse rather than raising an `AttributeError` past a caller's
-`except`.
-
-**Found by this round's own new test:** `redact_mapping` treated a
-namedtuple as a positional sequence, so a `token` or `private_key`
-*field* was never redacted by name. It is now redacted by field name
-like a mapping.
-
-**Two tests were strengthened because they could not fail.** The
-`re.escape` guard was probed by substituting a wildcard where the
-hand-written `\.` separators are, which proves nothing about the
-interpolated values; it now inspects the compiled patterns directly and
-rejects any unescaped `.` outside a character class. It is a *forward*
-guard, and the entry should not overstate it: no `settings.py` value
-interpolated into these patterns currently contains a regex
-metacharacter, so deleting a `re.escape()` call today produces a
-byte-identical pattern and the guard stays green. What it catches is the
-next value that does — `settings.py` already carries a dotted constant
-elsewhere — and a companion test demonstrates the difference by building
-both forms from a dotted string. The Drive test parametrised over the
-module's own constant, so deleting an entry would have deleted the case
-guarding it; it now pins the four production Drive settings against
-`settings.py` (three distinct folder ids) and exercises each in twelve
-shapes, with a second class covering the punctuation, quoting,
-double-encoding and zero-width forms found in round three.
-
-**Correction to an earlier claim in this entry's own draft:** the
-staging damage is *not* one-directional. `push_to_bq.py:62` derives the
-segment label from `" ".join(table_split[2:-2])`, so suffixing a
-*served* table keeps the correct served/control boolean while silently
-producing a wrong segment label. Only the controlled case is visible as
-a served/control error, which is precisely why "served output looks
-fine" is the wrong reassurance.
-
-**Round three fixed four ways a *caller's* mistake could fail open,**
-which matters more than an exotic-input defect because each is an easy
-thing to write. Passing the string `"test"` as the allowlist made the
-membership test substring containment, so it satisfied an allowlist of
-`"ih-test-project"`; passing the string `"test"` as the environment —
-which `parse_environment()` accepts elsewhere — raised `AttributeError`
-instead of refusing, past any caller's `except`; a non-iterable table
-argument raised rather than refused; and a bare string table name
-iterated character by character. All four now refuse with a reason.
-The Drive gate gained the separator forms token splitting missed:
-`id:<id>`, trailing comma, quotes, parentheses, double percent-encoding
-and zero-width characters. Redaction gained the prefixed and hyphenated
-key spellings that real logs actually contain — `HTTP_AUTHORIZATION`,
-`X-Api-Key`, `x-auth-token`, `set-cookie` — since a plain `\b` anchor
-never fires inside an underscore-joined name.
-
-**Found by the suite's own idempotence property, not by review:** the
-bare-`Bearer` rule bounded its value with a class excluding `]`, which
-is also the last character of `[REDACTED]`. Re-redacting an
-already-redacted line matched `[REDACTED` and appended a stray bracket,
-so the line grew on every pass. The rule now matches the marker as a
-whole and consumes anything trailing it, so `Bearer [REDACTED]leaked`
-does not keep `leaked`.
-
-**Round four found one fail-open the earlier rounds could not see,
-because it is not about the input at all.** `refusal_reasons()` was not
-re-entrant: a generator passed for `published_tables` was drained by the
-first evaluation, so every later evaluation saw zero entries and the
-gates fell silent. The permissive answer was the *later* one, which
-makes the natural caller shape — log the reasons, then ask again whether
-to abort — accept a production table on the second question. One-shot
-iterables are now materialised once in `RunRequest.__post_init__`, and
-the regression asserts the answer is identical across repeated calls.
-
-`resolve_output_name()` had the same enum-identity hole gate 5 was fixed
-for: the string `"test"` — which `parse_environment()` accepts elsewhere
-— fell past `environment is Environment.PRODUCTION` and *renamed a
-production output*. It now treats any non-`Environment` value as
-production, while `published_policy_violation()` treats the same input
-as test. The asymmetry is deliberate and documented: one function must
-never rename a production output, the other must never bless an unmarked
-test one.
-
-**Over-redaction was narrowed, on the reasoning that a redaction layer
-nobody keeps on redacts nothing.** The truncated-PEM rule consumed to
-end of input, so one clipped key in a traceback deleted every frame
-after it; it now consumes the base64 body and stops. Non-routable
-placeholders (`0.0.0.0`, `127.0.0.1`, `255.255.255.255`) are exempt from
-the IPv4 rule and octets are bounded, so `1.2.3.4.5` and `2.1.4.300` are
-left alone. A four-part version like `2.1.4.0` is still scrubbed — it is
-not distinguishable from an address, and the cost of being wrong is
-asymmetric — and that, along with POI centroid `latitude`/`longitude`
-sharing a column name with per-device location, is now recorded in the
-module as a known, accepted trade-off rather than left for a reader to
-discover.
-
-**Redaction gained the two shapes that need no key at all.** A list or
-nested object under a sensitive key lost only its first element, because
-the unquoted fallback stopped at the first space. And every rule
-required `key=` context, while the commonest logging shape in this repo
-supplies none — `print(f"using token {t}")`. Issuer-prefixed credentials
-(`ya29.`, `AIza`, `GOCSPX-`, `1//`) are now matched on the value alone.
-
-**Four tests that could not fail were replaced or supplemented**:
-approved-source patterns are now asserted end-anchored (`.match()` is a
-prefix match, so a missing `$` would approve `<approved>_evil`, proven
-end to end); the sensitive-key loop over the module's own constants is
-backed by an independently pinned list, so emptying a constant no longer
-empties the coverage; a reflective test fails if `settings.py` gains a
-`DRIVE_*` constant gate 4 does not know about; and the module-scoped
-fixture that imported the real automation module *before* conftest's
-cloud-client guard was made function-scoped, so the guard covers it.
-
-**Round five: a fix from round four was itself the worst defect in the
-entry.** The truncated-PEM rule was rewritten to stop consuming the rest
-of a traceback, and its replacement token test —
-`(?:\\[nr]|[A-Za-z0-9+/=]{8,}|…)+\Z` — is a nested quantifier. On a long
-base64 token that cannot reach the anchor, `re` enumerates every way to
-cut the run into parts of eight or more. Measured on the module's own
-stated input: 80 characters took 0.23s, 100 took **14.7s**. The comment
-directly above it explained that the body was scanned in code
-*specifically* to avoid that shape. Split into two single-quantifier
-patterns; 200,000 characters now take 0.03s, and the suite asserts a
-time bound rather than an output. The same rewrite had a second bug the
-timing test exposed: a whitespace-delimited token carries the
-punctuation that closed its context (`<body>",` inside a JSON string),
-so whole-token matching rejected the token and left the key body in the
-log. The body is now the leading run of key characters.
-
-Also this round: the re-entrancy fix covered the two table fields and
-missed `approved_test_projects` (fail-closed, but the guarantee is that
-the answer does not change); an iterable that raises part-way is now
-replaced with a value no gate can mistake for a sequence, because a
-generator that raised is *closed* — leaving it in place meant the gate
-iterated it, saw nothing, and accepted a request whose tables it never
-examined. `redact_mapping` redacted values but copied keys verbatim, so
-`{"203.0.113.42": 7}` — a per-device counter, the shape an audit record
-naturally takes — kept the identifier while `redact_text` of the same
-string scrubbed it. A bare JWT (`id_token` with a space, not `=`) is now
-matched on its value shape. And the invisible-character rule is decided
-by Unicode category rather than an enumerated list: every list drawn up
-so far had been missing a neighbour of something already on it.
-
-**Two more tests could not fail.** The pinned sensitive-key list
-asserted `pinned <= declared`, so deleting a key from the module left
-the suite green; it now asserts equality and pins all 23. The reflective
-`DRIVE_*` guard filtered on `isinstance(value, str)`, so a future tuple
-or dict of folders — the shape a fifth Drive constant would most likely
-take — was silently skipped.
-
-**Round six: the round-five fix for a fail-open was itself a fail-open,
-for a reason worth writing down.** Replacing a raising iterable with a
-sentinel only helps if you can tell *which* failure happened, and
-`except TypeError` around `tuple(value)` cannot distinguish "this object
-is not iterable" from "iterating it raised `TypeError`". The two need
-opposite handling — leave the first alone so the gate names it, replace
-the second — so the `TypeError` case fell into the wrong branch and a
-production-qualified table drew zero refusals again. Iterability is now
-asked separately, before materialising, and the regression is
-parametrised over five exception types rather than asserting the one
-that happened to be tried.
-
-The same round: `published_policy_violation()` was the one
-name-consuming function not routed through `_as_name()`, so the function
-whose job is to *report* a problem raised `AttributeError` on an integer
-codename; `parse_environment()` raised `AttributeError` rather than its
-own declared `EnvironmentConfigurationError` for a non-string, which a
-caller's `except EnvironmentConfigurationError` would not catch; the
-key-collision guard in `redact_mapping` fired only when the key had
-itself been rewritten, so an un-redacted key equal to the marker evicted
-an earlier entry, and the suffix it generated was never checked for
-collision either — both drop a record silently, which is worse than an
-un-redacted log because the record is now wrong as well; and a `bytes`
-key was invisible to the sensitivity test, since `str(b"password")` is
-`"b'password'"`, so both key and value survived.
-
-**Round seven closed the last gate that failed open, and it failed open
-for a structural reason rather than a coding one.** Gates 1-3 and 5 ask
-"is this value acceptable?", so a value they cannot read is refused.
-Gate 4 asks the opposite — "does a production id appear in this text?" —
-so a value with no useful text answers *no*, which is silence, not a
-refusal. An ordinary wrapper object makes that concrete: a
-`DriveFolder` holding `DRIVE_MAIN_FOLDER_ID` in an attribute stringifies
-to `<... object at 0x...>`, matches nothing, and the run was accepted
-while naming a production folder. The gate now refuses any
-`drive_folder` that is neither `None` nor a string. Also fixed: the
-collision suffix in `redact_mapping` was built with an f-string, so a
-colliding `bytes` or `tuple` key was downgraded to a string carrying its
-own repr; an unhashable key from a `Mapping` subclass raised rather than
-redacting; and `would_flip_served_control_flag`/
-`would_corrupt_segments_parse` suffixed the raw value while comparing
-the coerced one, so the two sides disagreed on anything non-string.
-
-**Accepted, not fixed — recorded so they are decisions rather than
-oversights.** `_decode_fully` stops after four percent-decoding rounds,
-so a five-times-encoded folder id is not seen; the bound is deliberate
-because decoding is not guaranteed to converge on adversarial input.
-`_PEM_BLOCK` is quadratic (not exponential) on a message containing
-thousands of BEGIN markers and no END. `RunRequest` does not defend
-against an infinite iterator. Message formatting uses `!r`, so an object
-whose `__repr__` raises escapes the gate that was meant to stop it.
-Each needs an adversarial input this layer never receives — nothing
-imports it — and none is a fail-open. Revisit them in Phase B, when
-these gates first sit in front of a real client.
-
-**Tests:** four focused files, the full offline suite, and
-`python -m compileall -q shared projects ui tests` (the command CLAUDE.md
-specifies, plus `tests`); counts recorded in the branch review notes.
-
-**Parity:** none affected. No production module, query, schema,
-credential flow, output path, or deployment file is touched;
-`.github/workflows/deploy.yml` is unmodified.
+**No `docs/code-audit.md` finding is opened or updated.** Phase A
+progresses no defect; it establishes contracts for a planned capability.
+`CLAUDE.md` records that finding-less work needs only a log entry, so
+nobody invents an `IH-###` for it later.
 
 **Base:** `feature/shared-config-foundation` at `8f35462`, the earliest
 commit carrying all four prerequisites (`shared/config/settings.py`,

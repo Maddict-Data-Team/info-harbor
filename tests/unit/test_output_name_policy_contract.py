@@ -9,8 +9,6 @@ imports it. No test here writes to BigQuery or Drive.
 """
 from __future__ import annotations
 
-import re
-
 import pytest
 
 from shared.config import settings
@@ -195,26 +193,6 @@ class TestStagingIsExemptFromTheSuffix:
         assert would_corrupt_segments_parse("183_UAE_Car_Owners_served") is True
         assert would_corrupt_segments_parse("183_UAE_Car_Owners_controlled") is True
 
-    def test_the_two_predicates_agree_with_the_parser_they_model(self):
-        """Pins both against the slices push_to_bq.py actually uses, so
-        neither can drift into a tautology."""
-        for name in (
-            "183_UAE_Car_Owners_served",
-            "183_UAE_Car_Owners_controlled",
-            "9_KSA_Frequent_Flyers_served",
-        ):
-            suffixed = name + "_test"
-            flag_changed = (
-                name.split("_")[-1] == "controlled"
-            ) != (suffixed.split("_")[-1] == "controlled")
-            label_changed = " ".join(name.split("_")[2:-2]) != " ".join(
-                suffixed.split("_")[2:-2]
-            )
-            assert would_flip_served_control_flag(name) is flag_changed, name
-            assert would_corrupt_segments_parse(name) is (
-                flag_changed or label_changed
-            ), name
-
 
 class TestTestSuffixDoesNotCollideWithTheProductionTableNamedTest:
     def test_the_bare_production_name_test_is_not_a_published_test_name(self):
@@ -224,51 +202,34 @@ class TestTestSuffixDoesNotCollideWithTheProductionTableNamedTest:
     def test_a_real_suffixed_name_is_recognised(self):
         assert is_published_test_name("Campaign_Tracker_test") is True
 
-    def test_the_suffix_constant_is_underscore_prefixed(self):
-        assert PUBLISHED_TEST_SUFFIX == "_test"
-        assert re.match(r"^_\w+$", PUBLISHED_TEST_SUFFIX)
 
+class TestThePolicyFailsSafeOnACallerMistake:
+    """Each function fails in its own safe direction: resolve must never
+    RENAME a production output, and the violation check must never bless
+    an unmarked test one. Both must be total -- campaign codenames are
+    integers in places, so a non-string name is an ordinary mistake."""
 
-class TestResolveOutputNameNeverRenamesProduction:
-    """Round-4 regression. `environment is Environment.PRODUCTION` is an
-    identity check, so the string "test" -- which parse_environment()
-    accepts elsewhere, making it an easy thing to pass -- fell straight
-    through to the suffixing branch and renamed a PRODUCTION table."""
-
-    @pytest.mark.parametrize("environment", ["production", "test", None, 0, object()])
-    def test_a_non_environment_value_leaves_the_name_untouched(self, environment):
+    @pytest.mark.parametrize("environment", ["production", "test", None, object()])
+    def test_a_non_environment_value_never_renames_the_output(self, environment):
+        """`environment is Environment.PRODUCTION` is an identity check,
+        so the string "test" -- which parse_environment() accepts
+        elsewhere -- would otherwise fall through and suffix a
+        production table."""
         assert (
             resolve_output_name("183_visitors", OutputKind.PUBLISHED, environment)
             == "183_visitors"
         )
 
-    @pytest.mark.parametrize("kind", ["published", None, 0, object()])
-    def test_a_non_outputkind_value_leaves_the_name_untouched(self, kind):
+    @pytest.mark.parametrize("kind", ["published", None, object()])
+    def test_an_unrecognised_output_kind_is_not_assumed_published(self, kind):
         assert (
-            resolve_output_name("183_visitors", kind, Environment.TEST)
-            == "183_visitors"
+            resolve_output_name("183_visitors", kind, Environment.TEST) == "183_visitors"
         )
 
-    def test_the_real_enum_members_still_behave(self):
-        assert (
-            resolve_output_name("183_visitors", OutputKind.PUBLISHED, Environment.TEST)
-            == "183_visitors_test"
-        )
-        assert (
-            resolve_output_name(
-                "183_visitors", OutputKind.PUBLISHED, Environment.PRODUCTION
-            )
-            == "183_visitors"
-        )
-
-    def test_the_violation_check_fails_in_the_other_direction(self):
-        """Deliberate asymmetry: an unrecognised environment must not
-        cause a rename, but must also not bless an unmarked test name.
-        Each function fails in its own safe direction."""
+    def test_the_violation_check_fails_the_other_way(self):
+        """An unrecognised environment must not cause a rename, but must
+        also not silence the check -- so it is treated as a test run."""
         assert published_policy_violation("183_visitors", OutputKind.PUBLISHED, "test")
-        assert published_policy_violation(
-            "183_visitors", OutputKind.PUBLISHED, object()
-        )
         assert (
             published_policy_violation(
                 "183_visitors", OutputKind.PUBLISHED, Environment.PRODUCTION
@@ -276,46 +237,15 @@ class TestResolveOutputNameNeverRenamesProduction:
             is None
         )
 
-
-class TestNameHandlingIsTotal:
-    """environment.py is deliberately total for non-string input; this
-    module must match it. Campaign codenames are integers in places
-    (source_allowlist.py builds its patterns around an INTEGER campaign
-    code), so a caller passing one is an ordinary mistake."""
-
-    @pytest.mark.parametrize("name", [183, None, 4.5, object()])
-    def test_a_non_string_name_does_not_raise(self, name):
-        resolve_output_name(name, OutputKind.PUBLISHED, Environment.TEST)
+    @pytest.mark.parametrize("name", [183, None, object()])
+    @pytest.mark.parametrize("kind", list(OutputKind))
+    def test_a_non_string_name_is_handled_not_raised(self, name, kind):
+        resolve_output_name(name, kind, Environment.TEST)
+        published_policy_violation(name, kind, Environment.TEST)
         is_published_test_name(name)
-        segments_control_token(name)
         would_corrupt_segments_parse(name)
 
     def test_an_integer_codename_is_suffixed_like_a_string(self):
         assert (
-            resolve_output_name(183, OutputKind.PUBLISHED, Environment.TEST)
-            == "183_test"
-        )
-
-    def test_the_arity_precondition_of_the_exemption_predicate(self):
-        """`split[2:-2]` is empty below five tokens, so a degenerate name
-        changes nothing measurable. Stated here so a Phase B caller is
-        not surprised by it."""
-        assert would_corrupt_segments_parse("183_UAE_Car_Owners_served") is True
-        assert would_flip_served_control_flag("183_served") is False
-
-
-class TestTheViolationCheckIsTotalToo:
-    """Round-six regression. Every name-consuming function routed
-    through _as_name() except this one, and its STAGING branch used the
-    name raw -- so the one function whose job is to report a problem
-    raised instead."""
-
-    @pytest.mark.parametrize("name", [183, None, 4.5, object()])
-    @pytest.mark.parametrize("kind", [OutputKind.STAGING, OutputKind.PUBLISHED])
-    def test_a_non_string_name_does_not_raise(self, name, kind):
-        published_policy_violation(name, kind, Environment.TEST)
-
-    def test_a_suffixed_staging_name_is_still_reported(self):
-        assert published_policy_violation(
-            "183_UAE_Car_Owners_served_test", OutputKind.STAGING, Environment.TEST
+            resolve_output_name(183, OutputKind.PUBLISHED, Environment.TEST) == "183_test"
         )

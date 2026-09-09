@@ -52,8 +52,7 @@ prohibited commands.
 - Keep cross-domain business code out of catch-all `utils` or `common`
   directories. Generic helpers must be pure and genuinely shared.
 - New cloud-facing code must be testable with the offline fakes. Never log
-  credentials, tokens, raw device identifiers, or sensitive query values —
-  `shared/observability/redaction.py` records the exact shapes to scrub.
+  credentials, tokens, raw device identifiers, or sensitive query values.
 
 ## Architecture quick map
 
@@ -67,11 +66,11 @@ prohibited commands.
   `variables.py` and `input.py` files remain authoritative for a component
   until its field-level parity is proven.
 - `shared/config/environment.py`, `shared/config/source_allowlist.py`,
-  `shared/config/output_policy.py`, `shared/observability/redaction.py`:
-  Phase A safety contracts. Additive, imported by no live entry point, and
-  **not enforced at runtime** — they state the test/production boundary, they
-  do not police it, and their presence authorizes no cloud testing. Wiring
-  them into an entry point is Phase B and needs explicit approval.
+  `shared/config/output_policy.py`: Phase A safety contracts. Additive,
+  imported by no live entry point, and **not enforced at runtime** — they
+  state the test/production boundary, they do not police it, and their
+  presence authorizes no cloud testing. Wiring them into an entry point is
+  Phase B and needs explicit approval.
 - `tests/`: offline unit tests, fakes, fixtures, and parity helpers.
 - `docs/architecture-and-test-environment-plan.md`: accepted target
   architecture and production-read/test-write boundary.
