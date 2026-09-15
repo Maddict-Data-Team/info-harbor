@@ -1,5 +1,14 @@
 # Info-Harbor - Restructured
 
+> **Superseded (marked 2026-09-15).** This pre-modernization document is
+> kept for history only. It is not an accurate description of the current
+> system:
+> - `test_paths.py` does not exist.
+> - Both `main_new.py` entry points failed at import until IH-014 and IH-015 were fixed.
+> - Database-loaded campaigns lose their segments (IH-004, open).
+>
+> For the current state read `docs/PROJECT_STATE.md`; for working rules read `AGENTS.md`.
+
 ## 🎯 Overview
 Info-Harbor is a comprehensive campaign workflow management system for Maddict, now restructured with a unified configuration system and improved maintainability.
 

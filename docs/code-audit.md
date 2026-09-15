@@ -1569,4 +1569,6 @@ Migrate authentication separately under IH-029.
 plus the full offline suite on every consuming migration.
 
 **Branch/PR/commit that progresses it:** `feature/shared-config-foundation`
-(uncommitted working tree pending review).
+-- committed as `8f35462` (2026-08-21); not yet merged to `dev` or `main`.
+Downstream component migrations continued on `feature/*-shared-config`
+branches (see `docs/PROJECT_STATE.md` §2).

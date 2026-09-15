@@ -4,6 +4,11 @@ The full rules for working in this repository live in `AGENTS.md`. This file
 is a compact pointer, not a duplicate — read `AGENTS.md` before making any
 change, and treat it as authoritative if anything here seems to conflict.
 
+@AGENTS.md
+
+Current audited state (branches, what works, open decisions):
+`docs/PROJECT_STATE.md`.
+
 ## The short version
 
 - **Read before you write.** This repo has duplicate-named files with
@@ -30,52 +35,39 @@ change, and treat it as authoritative if anything here seems to conflict.
 
 ## Common commands
 
-- Full offline test suite: `python -m pytest -q`
+- Full offline test suite: `python -m pytest -q` (on this Windows checkout
+  use `.venv/Scripts/python.exe -m pytest -q` — the system interpreter has
+  no pytest)
 - One test file: `python -m pytest tests/unit/<file>.py -q`
-- Syntax check: `python -m compileall -q shared projects ui`
+- Syntax check (matches CI): `python -m compileall -q projects shared ui tests campaign_manager.py`
 - List local and remote branches: `git branch -a`
 
 Do not run an application entry point as a general smoke test. The pipeline
 entry points can contact production services; see `AGENTS.md` §2 for the
-prohibited commands.
+prohibited commands. The full command table, including what is *not*
+configured (lint, type-check, e2e, build), is `AGENTS.md` §12.
 
-## Conventions
+## Conventions and architecture
 
-- Confirm the live entry point before editing: duplicate module names do not
-  imply duplicate behavior.
-- Keep new configuration additive and typed. Do not silently merge legacy
-  values that differ by application.
-- Preserve output parity by default. Any approved behavior change must cite
-  its audit finding and document the deliberate parity exception.
-- Do not add new `sys.path` mutation or generic same-name imports. Use an
-  explicit package or explicit file path when legacy module names collide.
-- Keep cross-domain business code out of catch-all `utils` or `common`
-  directories. Generic helpers must be pure and genuinely shared.
-- New cloud-facing code must be testable with the offline fakes. Never log
-  credentials, tokens, raw device identifiers, or sensitive query values.
+Moved to `AGENTS.md` §11 (architecture map) and §14 (coding conventions) so
+they have one canonical home.
 
-## Architecture quick map
+## Feature loop (Claude Code)
 
-- `projects/automation/`: current Cloud Function source. CI currently uploads
-  this directory alone; do not assume root-level modules are included in its
-  deployment artifact.
-- `projects/segments/`, `projects/poi/`, and `projects/campaign-tracker/`:
-  legacy workflows being migrated incrementally.
-- `ui/`: the current Flask operations application.
-- `shared/config/settings.py`: additive shared-settings foundation. Legacy
-  `variables.py` and `input.py` files remain authoritative for a component
-  until its field-level parity is proven.
-- `shared/config/environment.py`, `shared/config/source_allowlist.py`,
-  `shared/config/output_policy.py`: Phase A safety contracts. Additive,
-  imported by no live entry point, and **not enforced at runtime** — they
-  state the test/production boundary, they do not police it, and their
-  presence authorizes no cloud testing. Wiring them into an entry point is
-  Phase B and needs explicit approval.
-- `tests/`: offline unit tests, fakes, fixtures, and parity helpers.
-- `docs/architecture-and-test-environment-plan.md`: accepted target
-  architecture and production-read/test-write boundary.
-- `docs/code-audit.md`: living issue register. `docs/modernization-log.md`:
-  chronological change record.
+- `/plan-feature <slug> <description>` — write `features/<slug>/spec.md`, stop at `ready`.
+- `/review-feature spec <slug>` — adversarial spec review via the `feature-reviewer` subagent.
+- A human fills in the spec's **Approval** section.
+- `/implement-feature <slug>` — bounded build/validate loop (≤5 correction
+  cycles per invocation), stops at `reviewing`. Refuses to start without a
+  recorded spec-review `PASS`.
+- `/review-feature implementation <slug>` — the only step that runs the
+  independent `feature-reviewer`; on a `PASS` with a passing latest
+  `validation-<n>.md` it advances the feature to `human_review`.
+
+Never mark a feature `done`, and never merge, push, or deploy
+(`AGENTS.md` §18–22). The pre-existing read-only subagents
+(`repository-mapper`, `data-pipeline-reviewer`, `security-parity-reviewer`)
+remain available for focused investigation.
 
 ## Response footer
 
@@ -87,4 +79,4 @@ Blockers: <blockers or None>
 Handoff: <exact next action and who should take it>
 ```
 
-See `AGENTS.md` §1–9 for the full explanation of each rule above.
+See `AGENTS.md` §1–22 for the full explanation of each rule above.

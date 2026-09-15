@@ -1,5 +1,14 @@
 # Info-Harbor Restructuring Summary
 
+> **Superseded (marked 2026-09-15).** Historical record of an earlier
+> restructuring pass. Its "complete and ready for production" and
+> "100% backward compatibility" claims were not borne out:
+> - `test_paths.py` does not exist in the repository.
+> - The new entry points were broken at import (IH-014, IH-015; both since fixed).
+> - Database-loaded campaigns silently lose segments (IH-004, open).
+>
+> See `docs/PROJECT_STATE.md` and `docs/code-audit.md`.
+
 ## ✅ Completed Tasks
 
 ### 1. **File Location and Dependency Verification**

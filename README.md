@@ -41,6 +41,19 @@ A comprehensive campaign management system designed for location-based marketing
 > (`docs/code-audit.md` IH-025), not as the final security posture for
 > this UI.
 
+> **Outdated snapshot — read `docs/PROJECT_STATE.md` first (audited
+> 2026-09-15).** The status below was last updated 2026-08-21. Since then:
+> - Phase A safety contracts were added on `feature/phase-a-safety-contracts`, with 278 offline tests.
+> - The Phase 2 configuration migrations continued on a separate, diverged branch line.
+> - Nothing has been merged to `dev` or `main`.
+>
+> The Installation, Usage, and Environment Variables sections further down
+> also predate the modernization. For example, `ui/app.py` now refuses to
+> start without `INFO_HARBOR_FLASK_SECRET_KEY`, and the
+> `GOOGLE_CLOUD_PROJECT`, `BIGQUERY_DATASET`, and `API_KEYS_PATH` variables
+> are read by no code. Contributors and agents should follow `AGENTS.md`
+> instead.
+
 **Why this work is happening:** An independent audit found that Info-Harbor's
 reporting pipeline can silently produce zero output for certain campaign
 types, can run reports under the wrong campaign's identity, and has no

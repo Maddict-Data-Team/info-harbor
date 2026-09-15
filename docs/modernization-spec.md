@@ -5,6 +5,16 @@ contract any refactor must satisfy. For the detailed, per-defect evidence
 behind every claim here, see `docs/code-audit.md`. For the chronological
 record of work, see `docs/modernization-log.md`.
 
+> **Historical baseline (note added 2026-09-15).** §1 and §9 describe the
+> system as of `feature/safety-test-baseline` on 2026-08-19. Several
+> statements have since changed:
+> - `main_new.py` now imports (IH-014).
+> - The UI has interim authentication (IH-025).
+> - The suite has 278 tests rather than 50.
+>
+> The Compatibility Contract (§6) and the testing strategy (§7) remain
+> authoritative. For current facts, see `docs/PROJECT_STATE.md`.
+
 **Baseline for this document:** `feature/safety-test-baseline`, branched from
 `dev` at `810e30b5451e962bf7524bf8f22cb341322dda87`, itself descended from
 `main` at `c0f2e3779c57de37aa48fa48b9edf92e4170b3cb`.

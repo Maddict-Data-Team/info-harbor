@@ -1,6 +1,12 @@
 # Architecture and Test-Environment Plan
 
-**Status:** Accepted direction; implementation has not started.
+**Status:** Accepted direction. Phase A has been implemented, and Phase B
+onward has not started.
+- Phase A is on `feature/phase-a-safety-contracts` (`70f70e8`, `0bf25f4`, both WIP, not merged).
+- It ships three of the four contracts: environment, source allowlist, and output policy.
+- Redaction was deferred to the observability phase (`docs/modernization-log.md`, 2026-09-08).
+
+(Status updated 2026-09-15; see `docs/PROJECT_STATE.md`.)
 
 **Purpose:** Define the target repository shape, the production-read/test-write
 boundary, and the phased delivery gates for Info-Harbor. This plan supplements

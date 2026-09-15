@@ -7,6 +7,263 @@ in the **same** branch/PR as the code change it describes. See
 
 ---
 
+## 2026-09-15 — uncommitted on `chore/loop-engineering-setup` — Loop workflow consistency fixes, round 2
+
+**Goal:** Close a second round of gaps in the loop-engineering workflow found
+after round 1 (the entry immediately below this one), before any feature runs
+through it end to end. A human directed this correction, so — like round 1 —
+it has no `features/<slug>/spec.md` written *before* the fact and progresses
+no audit finding: **no `docs/code-audit.md` status changed and no `IH-###` was
+opened** (`CLAUDE.md`: finding-less work needs a log entry only). This round
+also adds a *retroactive* spec covering both rounds; see below.
+
+**Markdown only.** No production code, test, configuration, dependency, or
+workflow file changed, so there are **no output-parity implications**
+(`docs/modernization-spec.md` §6 Compatibility Contract is untouched).
+
+**Finding 4 — `/implement-feature` could start building without any spec
+review having run.** `.claude/skills/implement-feature/SKILL.md` Phase 0 (pre-fix
+item 5) only checked that an *existing* `verification/spec-review-<n>.md` was
+not an unresolved `FAIL` — it never required one to exist. A spec could reach
+`/implement-feature` with no adversarial spec review ever performed. Fixed by
+making it a hard precondition: `.claude/skills/implement-feature/SKILL.md:36-40`
+(Phase 0 item 2) now requires at least one `verification/spec-review-<n>.md`
+whose latest recorded verdict is `PASS`; if none exists, or the latest is not
+`PASS`, the skill stops without building, sets the queue to `blocked` with a
+note that spec review is required, and hands off to `/review-feature spec
+<slug>`. The same rule is now stated in `AGENTS.md:310-311` (§18 item 4, plus a
+short parenthetical in the §18 diagram), `CLAUDE.md:60-62`, and
+`features/README.md:69-70`. Grepped for every other place describing
+`/implement-feature`'s preconditions or refusal conditions
+(`features/_template/spec.md:15,158`) and found none that still implies spec
+review is optional — `features/_template/spec.md`'s existing lines concern the
+Approval section and blocking questions, a separate precondition, and were
+left unchanged.
+
+**Finding 5 — `loop-workflow-consistency`'s own evidence understated its
+precision.** `features/loop-workflow-consistency/verification/validation-1.md:7-13`
+described the working tree as carrying "~57 pre-existing modified files from
+earlier work" — an approximation, not a fact, and (on a fresh count) not even
+the right order of magnitude for *tracked* files. Fixed without altering any
+of that file's command records (the pass counts, exit codes, and warning-count
+discussion remain an accurate historical record of an actual run): the
+Git-state paragraph now states the exact, freshly observed count — 55
+pre-existing modified tracked files, none touched by this feature — and points
+to a new `features/loop-workflow-consistency/verification/validation-2.md`,
+which pastes a fresh `git status --short` verbatim and categorizes every line
+of it into four buckets: (a) the tracked files this feature itself touched
+(`AGENTS.md`, `CLAUDE.md`, `docs/modernization-log.md`) plus the untracked
+paths it owns; (b) the 55 unrelated pre-existing tracked modifications, listed
+by name; (c) the untracked `.codex/agents/*.toml` Codex mirrors, with mtimes,
+confirmed unrelated and untouched; (d) `projects/automation/test_backend_upload.py`
+(IH-042) in its own bucket, confirmed untouched by mtime, with the standing
+warning restated verbatim that it must never be run, imported, edited,
+deleted, or committed without an explicit human decision. `validation-2.md`
+also re-runs the four required validation commands one more time after all of
+this round's edits.
+
+**Added:** `features/loop-workflow-consistency/spec.md` — a **retroactive**
+spec covering both correction rounds (the implementation for both already
+happened as direct, human-directed corrections, not through `/plan-feature` →
+`/implement-feature`). It follows the same precedent `features/QUEUE.md`
+already records for "Phase A safety contracts" — retroactive spec →
+`/review-feature spec` → (skip `/implement-feature`, nothing is left to build)
+→ `/review-feature implementation` against the existing diff and evidence.
+Because the build already happened outside `/implement-feature`, its Approval
+section (checked only by `/implement-feature`'s Phase 0, which this feature
+never invokes) is deliberately left blank, with the spec stating why.
+`features/QUEUE.md`'s "Loop workflow consistency fixes" row now points its
+Specification column at this spec and its Notes column at the next two steps
+(`/review-feature spec`, then `/review-feature implementation`); its Status
+cell (`reviewing`) was left unchanged for the review skills to update.
+`features/loop-workflow-consistency/README.md` was updated to mention the new
+spec.
+
+**Tests:** run from the repository root on `chore/loop-engineering-setup` @
+`0bf25f4` after all of this round's edits, and recorded in full in
+`features/loop-workflow-consistency/verification/validation-2.md`:
+
+| Command | Exit | Result |
+|---|---|---|
+| `./.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider` | see `validation-2.md` | see `validation-2.md` |
+| `./.venv/Scripts/python.exe -m compileall -q projects shared ui tests campaign_manager.py` | see `validation-2.md` | see `validation-2.md` |
+| `git check-ignore -q tests/conftest.py` | see `validation-2.md` | see `validation-2.md` |
+| `git ls-files \| grep '^keys/'` | see `validation-2.md` | see `validation-2.md` |
+
+**Parity evidence:** none needed — Markdown only.
+
+**Rollback:** discard the Markdown edits (`git restore AGENTS.md CLAUDE.md
+docs/modernization-log.md` for the tracked files this round touched — this
+would also revert round 1's and the original setup's uncommitted edits to the
+same three files, since nothing distinguishes them until a commit exists), and
+delete the new untracked `features/loop-workflow-consistency/spec.md` and
+`features/loop-workflow-consistency/verification/validation-2.md`. There is no
+commit to `git revert` yet.
+
+**Expected next step, not yet performed by this change:** `/review-feature
+spec loop-workflow-consistency`, and on a `PASS`, `/review-feature
+implementation loop-workflow-consistency`. This entry does not run either.
+
+---
+
+## 2026-09-15 — uncommitted on `chore/loop-engineering-setup` — Loop workflow consistency fixes
+
+**Goal:** Repair three consistency defects in the loop-engineering workflow
+documents added by the entry below, before any feature runs through them. A
+human directed this correction, so it has no `features/<slug>/spec.md`; it
+progresses no audit finding, so **no `docs/code-audit.md` status changed and no
+`IH-###` was opened** (`CLAUDE.md`: finding-less work needs a log entry only).
+
+**Markdown only.** No production code, test, configuration, dependency, or
+workflow file changed, so there are **no output-parity implications**
+(`docs/modernization-spec.md` §6 Compatibility Contract is untouched).
+
+**Finding 1 — evidence records were being overwritten.**
+`.claude/skills/implement-feature/SKILL.md` told Phase 1 to record the
+pre-existing working-tree inventory in `verification/validation-1.md`, then had
+Phase 4 start `n` at 1 and write `verification/validation-<n>.md` over it, and
+Phase 5 wrote `implementation-review-<r>.md` with `<r>` never defined — all
+three contradict "never overwrite an earlier cycle's record" in
+`features/_template/verification/README.md`. Fixed by:
+
+- giving the pre-existing inventory its own family,
+  `verification/pre-existing-state-<n>.md`, added to that template's Files
+  table and to the directory layout in `features/README.md`;
+- stating **one** numbering rule for every numbered family in
+  `features/_template/verification/README.md`: `<n>` is derived, never assumed —
+  list the existing files of that family and use the highest + 1 (`1` when none
+  exists), never overwriting, including across re-invocations;
+- making `/implement-feature` Phase 1 and Phase 4 derive their numbers by that
+  rule, so a re-invocation continues the sequence. The bound of at most five
+  unsuccessful correction cycles now says explicitly that it counts cycles
+  *in this invocation*;
+- pointing `/review-feature`'s own numbering step at the same single rule.
+
+**Finding 2 — two documents claimed ownership of `human_review`.**
+`features/README.md` said only `/review-feature` may set it while
+`/implement-feature` told the builder to set it; both skills claimed to write
+`implementation-review-<n>.md`. One rule now applies everywhere: **the
+independent implementation review is performed and recorded only by
+`/review-feature implementation <slug>`**, which is also the only thing that
+may set `human_review`, and only when it has recorded a `feature-reviewer`
+`PASS` **and** the latest `validation-<n>.md` passed. `/implement-feature` now
+stops at `reviewing` and hands off; its Phase 5 became a hand-off phase, the
+three-`FAIL`-round bound moved to a Phase 0 precondition that stops as
+`blocked`, and its frontmatter description no longer claims to run the reviewer
+or reach `human_review`. The same rule was written into
+`.claude/skills/review-feature/SKILL.md`, `features/README.md` (state table,
+Rules, Skills table), `features/_template/spec.md`'s done checklist,
+`AGENTS.md` §18 (diagram and items 4–6), and `CLAUDE.md`'s feature-loop list.
+`AGENTS.md` §20's definition of done is unchanged: item 8 still requires the
+queue at `human_review` and a **human** to set `done`.
+
+**Finding 3 — stale branch and state references.** The recommended branch move
+has happened; the commit has not. Verified with
+`git rev-parse --abbrev-ref HEAD` (`chore/loop-engineering-setup`),
+`git rev-parse --short HEAD` (`0bf25f4`), and `git branch -a --points-at HEAD`
+(the same commit as `feature/phase-a-safety-contracts` and
+`origin/feature/phase-a-safety-contracts`). Corrected:
+
+- `features/QUEUE.md` — the Loop-engineering setup row's Branch and Notes
+  columns now read `chore/loop-engineering-setup` @ `0bf25f4`, uncommitted, with
+  human review and a commit outstanding. The Phase A row was left alone; its
+  `feature/phase-a-safety-contracts` @ `0bf25f4` reference is still correct.
+- `docs/PROJECT_STATE.md` — the **Audited state** line, the §8 uncommitted-work
+  row, and §15 step 1 now record the branch as existing and holding the work
+  uncommitted. §15's remaining recommendation (decide D1, then the first
+  Level-1 loop `ih-028-delete-from-drive-confirm`) is unchanged, as is the
+  historical Line A description in §2. **Last audited** stays 2026-09-15.
+- `docs/modernization-log.md` — **the heading of the entry immediately below
+  this one was corrected** from "uncommitted on
+  `feature/phase-a-safety-contracts` (intended for
+  `chore/loop-engineering-setup`)" to "uncommitted on
+  `chore/loop-engineering-setup`". It describes this same not-yet-committed
+  change; no older entry was altered.
+- `docs/architecture-and-test-environment-plan.md:5` and `README.md:46` were
+  deliberately **not** changed: they describe where the Phase A *commits* live,
+  which is still accurate.
+
+**Added:** `features/loop-workflow-consistency/README.md` and
+`features/loop-workflow-consistency/verification/validation-1.md`; a
+`Loop workflow consistency fixes` row in `features/QUEUE.md` at `reviewing`.
+
+**Tests:** run from the repository root on `chore/loop-engineering-setup` @
+`0bf25f4` after the edits, and recorded in full in
+`features/loop-workflow-consistency/verification/validation-1.md`:
+
+| Command | Exit | Result |
+|---|---|---|
+| `./.venv/Scripts/python.exe -m pytest -q -p no:cacheprovider` | 0 | **278 passed** — same pass count and exit code as the pre-change baseline. The *warning* count varies between 17 and 19 across identical runs (pre-existing: third-party deprecations, some raised only on a fresh extension-module import); see the validation record |
+| `python3 -m pytest -q` | 1 | `No module named pytest` — pre-existing environment state (`docs/PROJECT_STATE.md` §9 item 2) |
+| `./.venv/Scripts/python.exe -m compileall -q projects shared ui tests campaign_manager.py` | 0 | Pass |
+| `git check-ignore -q tests/conftest.py` | 1 | Correct — `tests/` is not ignored (IH-037) |
+| `git ls-files \| grep '^keys/'` | 1 | Correct — nothing printed |
+
+**Parity evidence:** none needed. The change touches only Markdown; the suite
+result is byte-for-byte the same count as the baseline in
+`docs/PROJECT_STATE.md` §10.
+
+**Rollback:** discard the Markdown edits listed above. Because the work is
+uncommitted, rollback is per file (`git checkout -- <path>` for the tracked
+`AGENTS.md`, `CLAUDE.md`, `docs/modernization-log.md` — which would also revert
+the *earlier* uncommitted setup edits in those files — and deleting the
+untracked `features/loop-workflow-consistency/` directory). Once committed,
+`git revert <sha>` of this single focused commit restores the previous wording.
+Nothing outside documentation would need reverting with it.
+
+---
+
+## 2026-09-15 — uncommitted on `chore/loop-engineering-setup` — Loop-engineering setup and current-state audit
+
+**Goal:** Reconstruct the repository's real state from code, Git history,
+and documentation, then add a structured feature workflow
+(plan → spec review → human approval → bounded implementation → independent
+review → human review) on top of the existing modernization process. Neither
+replaces the other.
+
+**No production code, test, configuration, dependency, or workflow file changed.**
+Markdown only. No `docs/code-audit.md` status changed, and no `IH-###` was
+opened. Candidate findings are listed, unnumbered, in
+`docs/PROJECT_STATE.md` §9, because Line A and Line B have allocated IDs
+independently.
+
+**Added:**
+
+- `docs/PROJECT_STATE.md` — evidence-based snapshot. Its key facts:
+  - modernization is split across two diverged branch lines, and
+    `feature/phase2-integration` exists only locally;
+  - `main` has none of the modernization work;
+  - this branch passes 278 offline tests;
+  - its docs are partly outdated.
+- `features/README.md`, `features/QUEUE.md`, `features/_template/spec.md`,
+  `features/_template/verification/README.md`.
+- `.claude/agents/feature-reviewer.md` — fresh-context adversarial reviewer
+  that returns `PASS` or `FAIL` and is read-only by instruction.
+- `.claude/skills/plan-feature/`, `implement-feature/`, `review-feature/` (`SKILL.md` each).
+
+**Updated:**
+
+- `AGENTS.md` — added §10–22. §1–9 are unchanged apart from the header pointer.
+- `CLAUDE.md` — imports `AGENTS.md`. The syntax-check command now matches CI.
+  Conventions and the architecture map moved into `AGENTS.md` §11 and §14. Adds
+  a feature-loop section.
+- `README.md`, `README_NEW.md`, `RESTRUCTURE_SUMMARY.md`,
+  `docs/architecture-and-test-environment-plan.md`,
+  `docs/modernization-spec.md` — outdated or superseded notes. No content deleted.
+- `docs/code-audit.md` IH-048 — "uncommitted working tree" corrected to commit `8f35462`.
+
+**Tests:** Before the change, `.venv/Scripts/python.exe -m pytest -q` gave
+278 passed. The CI `compileall` command exited 0. After the change, both were
+re-run (see the final setup report). The system `python -m pytest` fails on
+this machine for lack of pytest (environment, pre-existing).
+
+**Parity implications:** None. Documentation and agent instructions only.
+
+**Rollback:** Delete the added files and revert the Markdown edits. Nothing
+depends on them at runtime.
+
+---
+
 ## 2026-09-08 — `feature/phase-a-safety-contracts` — Phase A: test/production safety contracts
 
 **Goal:** The Phase A gate of `docs/architecture-and-test-environment-plan.md`
