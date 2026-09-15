@@ -1,0 +1,26 @@
+Do not merge, push, delete, amend, or reset anything.
+
+You have permission to create one follow-up commit on
+chore/loop-engineering-setup that corrects only the workflow state and
+validation evidence.
+
+1. Replace the WSL-derived “55 modified files” claim with the native Git facts:
+   before 50268c1, native Git reported 9 tracked modifications and 17 untracked
+   files. Explain that the larger WSL count was CRLF/LF interpretation noise,
+   not actual repository modifications.
+
+2. Update docs/PROJECT_STATE.md and features/QUEUE.md to show:
+   chore/loop-engineering-setup @ 50268c1;
+   the workflow setup is committed;
+   only .codex/agents/*.toml and
+   projects/automation/test_backend_upload.py remain untracked;
+   formal review is still pending.
+
+3. Preserve the append-only modernization log. Add a new correction entry
+   instead of silently rewriting historical entries.
+
+4. Do not claim human_review or PASS. After the correction commit, stop and
+   give me its SHA.
+
+5. Do not rerun merge-tree yet. It must be rerun against the final tip after
+   the formal review records are committed.
